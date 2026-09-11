@@ -83,6 +83,12 @@ button,input,select{font:inherit}
 .st{display:grid;grid-template-columns:36px 44px 1fr auto;gap:6px;align-items:center;background:#fff;border:3px solid #222;border-radius:14px;padding:6px;margin-bottom:8px}
 .st .n{font-weight:700;font-size:20px;text-align:center}
 .st img{width:44px;height:44px}
+.st .pick{display:flex;align-items:center;gap:6px;padding:3px 8px;border:2px solid #999;border-radius:8px;background:#fff;cursor:pointer;width:100%;text-align:left}
+.st .pick img{width:32px;height:32px}.st .pick span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:55vh;overflow:auto;margin-top:10px}
+.grid button{border:3px solid #222;border-radius:12px;background:#fff;padding:4px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;font-size:11px;font-weight:600;line-height:1.1}
+.grid button img{width:56px;height:56px;image-rendering:pixelated}.grid button.sel{background:var(--yellow)}
+.grid button:active{transform:scale(.95)}
 .st .fields{display:flex;flex-direction:column;gap:4px;min-width:0}
 .st input,.st select{width:100%;padding:5px 8px;border:2px solid #999;border-radius:8px;background:#fff}
 .st .ctl{display:flex;flex-direction:column;gap:3px}
@@ -161,6 +167,14 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   <div class="row"><button class="btn grey" id="bakClose">Zurück</button><button class="btn blue" id="bakLoad">Laden</button></div>
 </div></div>
 
+<!-- Pokémon-Auswahl -->
+<div class="ov" id="pickOv"><div class="card" style="padding:14px">
+  <h2>Welches Pokémon?</h2>
+  <input class="code" id="pickSearch" style="font-size:18px;letter-spacing:0;text-transform:none;padding:8px" placeholder="Suchen…">
+  <div class="grid" id="pickGrid"></div>
+  <button class="btn grey" id="pickClose" style="margin-top:10px">Zurück</button>
+</div></div>
+
 <!-- Admin sheet -->
 <div id="admin">
   <header><span>🛠️ Admin</span><span class="grow"></span>
@@ -172,6 +186,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
     <button class="btn grey" id="resetProg">🔄 Fortschritt zurücksetzen</button>
     <button class="btn grey" id="backupBtn">💾 Backup</button>
     <button class="btn grey" id="pinChange">🔒 PIN ändern</button>
+    <button class="btn grey" id="mapStyleBtn">🗺️ Karte</button>
   </div>
 </div>
 
@@ -184,31 +199,34 @@ const $=id=>document.getElementById(id);
 
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
-let S=Object.assign({stations:[],progress:0,pin:'1234'},JSON.parse(localStorage.getItem(KEY)||'{}'));
+let S=Object.assign({stations:[],progress:0,pin:'1234',mapStyle:'classic'},JSON.parse(localStorage.getItem(KEY)||'{}'));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 let admin=false, me=null, follow=true, markers=[], meMarker=null, started=false;
 
 // ---- map (ponytail: OpenFreeMap vector tiles, no API key; Pokémon-Go-Farben) ----
-const G='#79d27f',G2='#5fc46e',G3='#96e48c',ROAD='#fbf7ea',ROAD2='#d9e9c9',WATER='#5cc8f5',BLDG='#e6ecdc';
-const road=(id,cls,w,color,extra={})=>({id,type:'line',source:'omt','source-layer':'transportation',filter:['all',['in','class',...cls],['!=','brunnel','tunnel']],layout:{'line-cap':'round','line-join':'round'},paint:Object.assign({'line-color':color,'line-width':['interpolate',['exponential',1.5],['zoom'],12,w[0],18,w[1]]},extra)});
-const STYLE={version:8,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+// ponytail: zwei Paletten, gleiche Layer. 'classic' = knallig, 'go' = näher am echten Pokémon-Go-Look (kühleres Grün, graue Straßen, bläuliche Gebäude)
+const PAL={
+ classic:{G:'#79d27f',G2:'#5fc46e',G3:'#96e48c',PITCH:'#b3f29a',ROAD:'#fbf7ea',ROAD2:'#d9e9c9',PATH:'#fff',WATER:'#5cc8f5',BLDG:'#e6ecdc',RAIL:'#b8d3aa',LBL:'#2f6b3a',HALO:'#fff',PH:'#2f6b3a'},
+ go:{G:'#5fae7c',G2:'#4c9a66',G3:'#79c98a',PITCH:'#8fd68f',ROAD:'#edf2ee',ROAD2:'#bfd0c4',PATH:'#dfe9e0',WATER:'#63c4f0',BLDG:'#d3e0e6',RAIL:'#a9bfb0',LBL:'#fff',HALO:'#3d7a55',PH:'#3d7a55'}
+};
+const STYLE=({G,G2,G3,PITCH,ROAD,ROAD2,PATH,WATER,BLDG,RAIL,LBL,HALO,PH})=>({version:8,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
  sources:{omt:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'© OpenStreetMap © OpenFreeMap'}},
  layers:[
   {id:'bg',type:'background',paint:{'background-color':G}},
   {id:'wood',type:'fill',source:'omt','source-layer':'landcover',filter:['in','class','wood','grass','farmland'],paint:{'fill-color':G2,'fill-opacity':.8}},
   {id:'park',type:'fill',source:'omt','source-layer':'park',paint:{'fill-color':G3}},
-  {id:'pitch',type:'fill',source:'omt','source-layer':'landuse',filter:['in','class','pitch','playground','garden'],paint:{'fill-color':'#b3f29a'}},
+  {id:'pitch',type:'fill',source:'omt','source-layer':'landuse',filter:['in','class','pitch','playground','garden'],paint:{'fill-color':PITCH}},
   {id:'water',type:'fill',source:'omt','source-layer':'water',paint:{'fill-color':WATER}},
   {id:'river',type:'line',source:'omt','source-layer':'waterway',paint:{'line-color':WATER,'line-width':['interpolate',['linear'],['zoom'],12,1,18,6]}},
-  road('rail',['rail','transit'],[1,3],'#b8d3aa',{'line-dasharray':[3,3]}),
-  road('path',['path','track'],[.5,2],'#fff',{'line-dasharray':[2,2],'line-opacity':.8}),
+  road('rail',['rail','transit'],[1,3],RAIL,{'line-dasharray':[3,3]}),
+  road('path',['path','track'],[.5,2],PATH,{'line-dasharray':[2,2],'line-opacity':.8}),
   road('minor_c',['minor','service'],[1.5,9],ROAD2),road('minor',['minor','service'],[1,6],ROAD),
   road('main_c',['tertiary','secondary','primary','trunk','motorway'],[3,16],ROAD2),road('main',['tertiary','secondary','primary','trunk','motorway'],[2,12],ROAD),
   {id:'bldg',type:'fill-extrusion',source:'omt','source-layer':'building',minzoom:14,paint:{'fill-extrusion-color':BLDG,'fill-extrusion-height':['min',['coalesce',['get','render_height'],8],12],'fill-extrusion-opacity':.9}},
-  {id:'street_lbl',type:'symbol',source:'omt','source-layer':'transportation_name',minzoom:15,layout:{'symbol-placement':'line','text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':11},paint:{'text-color':'#2f6b3a','text-halo-color':'#fff','text-halo-width':1.5}},
-  {id:'place_lbl',type:'symbol',source:'omt','source-layer':'place',filter:['in','class','city','town','village','suburb','neighbourhood'],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',18,'town',15,13]},paint:{'text-color':'#fff','text-halo-color':'#2f6b3a','text-halo-width':2}}
- ]};
-const map=new maplibregl.Map({container:'map',style:STYLE,center:[10.4515,51.1657],zoom:5,pitch:0,attributionControl:{compact:true}});
+  {id:'street_lbl',type:'symbol',source:'omt','source-layer':'transportation_name',minzoom:15,layout:{'symbol-placement':'line','text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':11},paint:{'text-color':LBL,'text-halo-color':HALO,'text-halo-width':1.5}},
+  {id:'place_lbl',type:'symbol',source:'omt','source-layer':'place',filter:['in','class','city','town','village','suburb','neighbourhood'],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',18,'town',15,13]},paint:{'text-color':'#fff','text-halo-color':PH,'text-halo-width':2}}
+ ]});
+const map=new maplibregl.Map({container:'map',style:STYLE(PAL[S.mapStyle]||PAL.classic),center:[10.4515,51.1657],zoom:5,pitch:0,attributionControl:{compact:true}});
 map.touchPitch.disable();
 map.on('dragstart',()=>follow=false);
 map.on('click',e=>{ if(admin) addStation(e.lngLat.lat,e.lngLat.lng); });
@@ -303,21 +321,30 @@ function addStation(lat,lng){
 $('addHere').onclick=()=>{ if(!me){alert('Noch keine GPS-Position. Erst ▶ starten (Admin verlassen), dann zurückkommen.');return} addStation(me[0],me[1]); };
 
 function renderAdmin(){
-  const opts=NAMES.map((n,i)=>`<option value="${i+1}">#${i+1} ${n}</option>`).join('');
   $('stations').innerHTML=S.stations.map((st,i)=>`<div class="st">
     <div class="n">${i+1}</div><img src="${SPR(st.pokemon)}">
     <div class="fields">
-      <select data-i="${i}" data-k="pokemon">${opts}</select>
+      <button class="pick" data-i="${i}" data-a="pick"><img src="${SPR(st.pokemon)}"><span>#${st.pokemon} ${NAMES[st.pokemon-1]}</span> ▾</button>
       <input data-i="${i}" data-k="code" value="${st.code||''}" placeholder="Geheim-Code" autocapitalize="characters">
     </div>
     <div class="ctl"><button data-i="${i}" data-a="up">▲</button><button data-i="${i}" data-a="down">▼</button><button class="del" data-i="${i}" data-a="del">✕</button></div>
   </div>`).join('') || '<p style="text-align:center;color:#777">Noch keine Stationen. Tippe auf die Karte!</p>';
-  $('stations').querySelectorAll('select').forEach((s,i)=>s.value=S.stations[i].pokemon);
 }
-$('stations').addEventListener('change',e=>{const t=e.target,i=+t.dataset.i;if(t.dataset.k==='pokemon')S.stations[i].pokemon=+t.value;else S.stations[i].code=t.value;save();renderMarkers();if(t.tagName==='SELECT')renderAdmin();});
+$('stations').addEventListener('change',e=>{const t=e.target;if(t.dataset.k==='code'){S.stations[+t.dataset.i].code=t.value;save();}});
+
+// ---- Pokémon picker ----
+let pickFor=-1;
+$('pickGrid').innerHTML=NAMES.map((n,i)=>`<button data-id="${i+1}"><img src="${SPR(i+1)}" loading="lazy">${n}</button>`).join('');
+function openPick(i){pickFor=i;$('pickSearch').value='';filterPick();$('pickGrid').querySelectorAll('button').forEach(b=>b.classList.toggle('sel',+b.dataset.id===S.stations[i].pokemon));$('pickOv').classList.add('on');$('pickGrid').querySelector('.sel')?.scrollIntoView({block:'center'});}
+function filterPick(){const q=$('pickSearch').value.trim().toLowerCase();$('pickGrid').querySelectorAll('button').forEach(b=>b.hidden=!!q&&!b.textContent.toLowerCase().includes(q)&&b.dataset.id!==q);}
+$('pickSearch').oninput=filterPick;
+$('pickClose').onclick=()=>$('pickOv').classList.remove('on');
+$('pickGrid').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.stations[pickFor].pokemon=+b.dataset.id;save();$('pickOv').classList.remove('on');renderAll();};
+$('mapStyleBtn').onclick=()=>{S.mapStyle=S.mapStyle==='go'?'classic':'go';save();map.setStyle(STYLE(PAL[S.mapStyle]));};
 $('stations').addEventListener('input',e=>{const t=e.target;if(t.dataset.k==='code'){S.stations[+t.dataset.i].code=t.value;save();}});
 $('stations').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const i=+b.dataset.i,a=b.dataset.a,s=S.stations;
+  if(a==='pick'){openPick(i);return}
   if(a==='del'){if(!confirm(`Station ${i+1} löschen?`))return;s.splice(i,1);}
   if(a==='up'&&i>0)[s[i-1],s[i]]=[s[i],s[i-1]];
   if(a==='down'&&i<s.length-1)[s[i+1],s[i]]=[s[i],s[i+1]];
