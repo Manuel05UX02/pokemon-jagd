@@ -43,8 +43,7 @@ button,input,select{font:inherit}
 .pm.dim img{opacity:.45;filter:grayscale(1);animation:none}
 .pm .ring{position:absolute;left:50%;bottom:2px;width:40px;height:14px;transform:translateX(-50%);border-radius:50%;background:rgba(255,203,5,.7);border:2px solid #222;z-index:-1}
 .me{width:34px;height:34px;border-radius:50%;background:linear-gradient(#e3350d 0 48%,#222 48% 56%,#fff 56%);border:3px solid #222;box-shadow:0 0 0 4px rgba(42,117,187,.35);position:relative}
-.me .beam{display:none;position:absolute;left:50%;top:50%;width:110px;height:110px;transform:translate(-50%,-50%);border-radius:50%;background:conic-gradient(from -28deg,rgba(42,117,187,.55) 0 56deg,transparent 56deg);z-index:-1;pointer-events:none}
-.me.hdg .beam{display:block}
+.beam{width:140px;height:140px;border-radius:50%;background:conic-gradient(from -28deg,rgba(42,117,187,.6) 0 56deg,transparent 56deg);pointer-events:none}
 .me::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;background:#fff;border:3px solid #222;transform:translate(-50%,-50%)}
 
 /* ---- Bottom HUD ---- */
@@ -232,8 +231,9 @@ const STYLE=({G,G2,G3,PITCH,ROAD,ROAD2,PATH,WATER,BLDG,RAIL,LBL,HALO,PH})=>({ver
 const map=new maplibregl.Map({container:'map',style:STYLE(PAL[S.mapStyle]||PAL.classic),center:[10.4515,51.1657],zoom:5,pitch:0,attributionControl:{compact:true}});
 map.touchPitch.disable();
 map.on('dragstart',()=>follow=false);
+map.on('rotatestart',e=>{if(e.originalEvent)follow=false;});
 map.on('click',e=>{ if(admin) addStation(e.lngLat.lat,e.lngLat.lng); });
-const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started?50:0,duration:600});
+const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started?50:0,bearing:heading??map.getBearing(),duration:600});
 
 function el(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
 function pmEl(st,i,dim){return el(`<div class="pm${dim?' dim':''}"><div class="ring"></div><img src="${ART(st.pokemon)}"><div class="num">${i+1}</div></div>`)}
@@ -258,10 +258,12 @@ function start(){
   started=true; $('lens').classList.add('live');
   navigator.geolocation.watchPosition(p=>{
     me=[p.coords.latitude,p.coords.longitude];
-    if(!meMarker){meMarker=new maplibregl.Marker({element:el('<div class="me"><div class="beam"></div></div>'),rotationAlignment:'map',pitchAlignment:'viewport'}).setLngLat([me[1],me[0]]).addTo(map);goTo(me,17.5);}
+    if(!meMarker){
+      beam=new maplibregl.Marker({element:el('<div class="beam" hidden></div>'),rotationAlignment:'map',pitchAlignment:'map'}).setLngLat([me[1],me[0]]).addTo(map);
+      meMarker=new maplibregl.Marker({element:el('<div class="me"></div>')}).setLngLat([me[1],me[0]]).addTo(map);goTo(me,17.5);}
     // ponytail: GPS-Kurs als Fallback, solange kein Kompass-Event kam
     if(!compassOk&&p.coords.heading!=null&&p.coords.speed>1)setHeading(p.coords.heading);
-    else{meMarker.setLngLat([me[1],me[0]]);if(follow)goTo(me);}
+    else{meMarker.setLngLat([me[1],me[0]]);beam.setLngLat([me[1],me[0]]);if(follow)goTo(me);}
     renderHud();
   },e=>{$('banner').textContent='GPS aus? Bitte Standort erlauben.';},{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
   navigator.wakeLock?.request('screen').catch(()=>{});
@@ -278,7 +280,14 @@ function onOrient(e){
   const h=e.webkitCompassHeading!=null?e.webkitCompassHeading:(e.absolute&&e.alpha!=null?(360-e.alpha)%360:null);
   if(h==null)return; compassOk=true; setHeading(h);
 }
-function setHeading(h){ if(!meMarker)return; meMarker.setRotation(h); meMarker.getElement().classList.add('hdg'); }
+let heading=null, beam=null, lastTurn=0;
+function setHeading(h){
+  heading=h; if(!beam)return;
+  beam.setRotation(h); beam.getElement().hidden=false;
+  // ponytail: Karte dreht sich mit Blickrichtung (wie Google-Maps-Kompassmodus); max ~6x/s, nur wenn wir dem Spieler folgen
+  const now=Date.now(), d=((h-map.getBearing()+540)%360)-180;
+  if(follow&&!admin&&Math.abs(d)>1.5&&now-lastTurn>160){lastTurn=now;map.easeTo({bearing:h,center:me?[me[1],me[0]]:undefined,duration:200,easing:t=>t});}
+}
 $('locBtn').onclick=()=>{follow=true;if(me)goTo(me,Math.max(map.getZoom(),17));};
 
 // ---- HUD ----
@@ -327,7 +336,7 @@ $('doneClose').onclick=()=>$('doneOv').classList.remove('on');
 $('gearBtn').onclick=()=>{ if(admin){leaveAdmin();return} $('pinIn').value='';$('pinErr').textContent='';$('pinOv').classList.add('on');setTimeout(()=>$('pinIn').focus(),100); };
 $('pinCancel').onclick=()=>$('pinOv').classList.remove('on');
 $('pinOk').onclick=tryPin; $('pinIn').onkeydown=e=>{if(e.key==='Enter')tryPin()};
-function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on');admin=true;$('admin').classList.add('on');$('gearBtn').textContent='👁️';renderAll();if(S.stations.length){const b=new maplibregl.LngLatBounds();S.stations.forEach(s=>b.extend([s.lng,s.lat]));map.fitBounds(b,{padding:60,maxZoom:17,pitch:0});}} else $('pinErr').textContent='Falsche PIN'; }
+function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on');admin=true;$('admin').classList.add('on');$('gearBtn').textContent='👁️';renderAll();if(S.stations.length){const b=new maplibregl.LngLatBounds();S.stations.forEach(s=>b.extend([s.lng,s.lat]));map.fitBounds(b,{padding:60,maxZoom:17,pitch:0,bearing:0});} else map.easeTo({pitch:0,bearing:0});} else $('pinErr').textContent='Falsche PIN'; }
 function leaveAdmin(){admin=false;$('admin').classList.remove('on');$('gearBtn').textContent='⚙️';follow=true;renderAll();}
 $('adminDone').onclick=leaveAdmin;
 
