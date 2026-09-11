@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#e3350d">
 <title>Poké-Jagd</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23e3350d' stroke='%23222' stroke-width='6'/><path d='M4 50h92' stroke='%23222' stroke-width='8'/><path d='M50 96A46 46 0 0 1 4 50h92A46 46 0 0 1 50 96z' fill='white'/><circle cx='50' cy='50' r='14' fill='white' stroke='%23222' stroke-width='6'/></svg>">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/6.1.0/maplibre-gl.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--red:#e3350d;--red-d:#b0260a;--yellow:#ffcb05;--blue:#2a75bb;--blue-d:#1b4f80;--ink:#1f1f1f;--frame:#2b2b2b;--paper:#fff8e7;--green:#3fbf5a}
@@ -30,7 +30,7 @@ button,input,select{font:inherit}
 /* ---- Map ---- */
 #mapwrap{flex:1;position:relative;margin:8px;border:5px solid #222;border-radius:18px;overflow:hidden;background:#cde;box-shadow:inset 0 0 0 4px #fff}
 #map{position:absolute;inset:0;z-index:1}
-.leaflet-control-attribution{font-size:9px!important;opacity:.7}
+.maplibregl-ctrl-attrib{font-size:9px!important;opacity:.7}.maplibregl-marker{cursor:pointer}
 .map-fabs{position:absolute;right:10px;bottom:10px;z-index:500;display:flex;flex-direction:column;gap:8px}
 .banner{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:500;background:var(--paper);border:3px solid #222;border-radius:14px;padding:6px 14px;font-weight:600;font-size:15px;box-shadow:0 3px 0 #222;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
 .banner.admin{background:var(--yellow)}
@@ -175,7 +175,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/6.1.0/maplibre-gl.min.js"></script>
 <script>
 const NAMES=["Bisasam","Bisaknosp","Bisaflor","Glumanda","Glutexo","Glurak","Schiggy","Schillok","Turtok","Raupy","Safcon","Smettbo","Hornliu","Kokuna","Bibor","Taubsi","Tauboga","Tauboss","Rattfratz","Rattikarl","Habitak","Ibitak","Rettan","Arbok","Pikachu","Raichu","Sandan","Sandamer","Nidoran♀","Nidorina","Nidoqueen","Nidoran♂","Nidorino","Nidoking","Piepi","Pixi","Vulpix","Vulnona","Pummeluff","Knuddeluff","Zubat","Golbat","Myrapla","Duflor","Giflor","Paras","Parasek","Bluzuk","Omot","Digda","Digdri","Mauzi","Snobilikat","Enton","Entoron","Menki","Rasaff","Fukano","Arkani","Quapsel","Quaputzi","Quappo","Abra","Kadabra","Simsala","Machollo","Maschock","Machomei","Knofensa","Ultrigaria","Sarzenia","Tentacha","Tentoxa","Kleinstein","Georok","Geowaz","Ponita","Gallopa","Flegmon","Lahmus","Magnetilo","Magneton","Porenta","Dodu","Dodri","Jurob","Jugong","Sleima","Sleimok","Muschas","Austos","Nebulak","Alpollo","Gengar","Onix","Traumato","Hypno","Krabby","Kingler","Voltobal","Lektrobal","Owei","Kokowei","Tragosso","Knogga","Kicklee","Nockchan","Schlurp","Smogon","Smogmog","Rihorn","Rizeros","Chaneira","Tangela","Kangama","Seeper","Seemon","Goldini","Golking","Sterndu","Starmie","Pantimos","Sichlor","Rossana","Elektek","Magmar","Pinsir","Tauros","Karpador","Garados","Lapras","Ditto","Evoli","Aquana","Blitza","Flamara","Porygon","Amonitas","Amoroso","Kabuto","Kabutops","Aerodactyl","Relaxo","Arktos","Zapdos","Lavados","Dratini","Dragonir","Dragoran","Mewtu","Mew"];
 const ART=id=>`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
@@ -186,25 +186,46 @@ const $=id=>document.getElementById(id);
 const KEY='pokejagd';
 let S=Object.assign({stations:[],progress:0,pin:'1234'},JSON.parse(localStorage.getItem(KEY)||'{}'));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
-let admin=false, me=null, follow=true, markers=[], meMarker=null, accCircle=null, started=false;
+let admin=false, me=null, follow=true, markers=[], meMarker=null, started=false;
 
-// ---- map ----
-const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([51.1657,10.4515],6);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+// ---- map (ponytail: OpenFreeMap vector tiles, no API key; Pokémon-Go-Farben) ----
+const G='#79d27f',G2='#5fc46e',G3='#96e48c',ROAD='#fbf7ea',ROAD2='#d9e9c9',WATER='#5cc8f5',BLDG='#e6ecdc';
+const road=(id,cls,w,color,extra={})=>({id,type:'line',source:'omt','source-layer':'transportation',filter:['all',['in','class',...cls],['!=','brunnel','tunnel']],layout:{'line-cap':'round','line-join':'round'},paint:Object.assign({'line-color':color,'line-width':['interpolate',['exponential',1.5],['zoom'],12,w[0],18,w[1]]},extra)});
+const STYLE={version:8,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+ sources:{omt:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'© OpenStreetMap © OpenFreeMap'}},
+ layers:[
+  {id:'bg',type:'background',paint:{'background-color':G}},
+  {id:'wood',type:'fill',source:'omt','source-layer':'landcover',filter:['in','class','wood','grass','farmland'],paint:{'fill-color':G2,'fill-opacity':.8}},
+  {id:'park',type:'fill',source:'omt','source-layer':'park',paint:{'fill-color':G3}},
+  {id:'pitch',type:'fill',source:'omt','source-layer':'landuse',filter:['in','class','pitch','playground','garden'],paint:{'fill-color':'#b3f29a'}},
+  {id:'water',type:'fill',source:'omt','source-layer':'water',paint:{'fill-color':WATER}},
+  {id:'river',type:'line',source:'omt','source-layer':'waterway',paint:{'line-color':WATER,'line-width':['interpolate',['linear'],['zoom'],12,1,18,6]}},
+  road('rail',['rail','transit'],[1,3],'#b8d3aa',{'line-dasharray':[3,3]}),
+  road('path',['path','track'],[.5,2],'#fff',{'line-dasharray':[2,2],'line-opacity':.8}),
+  road('minor_c',['minor','service'],[1.5,9],ROAD2),road('minor',['minor','service'],[1,6],ROAD),
+  road('main_c',['tertiary','secondary','primary','trunk','motorway'],[3,16],ROAD2),road('main',['tertiary','secondary','primary','trunk','motorway'],[2,12],ROAD),
+  {id:'bldg',type:'fill-extrusion',source:'omt','source-layer':'building',minzoom:14,paint:{'fill-extrusion-color':BLDG,'fill-extrusion-height':['coalesce',['get','render_height'],8],'fill-extrusion-opacity':.9}},
+  {id:'street_lbl',type:'symbol',source:'omt','source-layer':'transportation_name',minzoom:15,layout:{'symbol-placement':'line','text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':11},paint:{'text-color':'#2f6b3a','text-halo-color':'#fff','text-halo-width':1.5}},
+  {id:'place_lbl',type:'symbol',source:'omt','source-layer':'place',filter:['in','class','city','town','village','suburb','neighbourhood'],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',18,'town',15,13]},paint:{'text-color':'#fff','text-halo-color':'#2f6b3a','text-halo-width':2}}
+ ]};
+const map=new maplibregl.Map({container:'map',style:STYLE,center:[10.4515,51.1657],zoom:5,pitch:0,attributionControl:{compact:true}});
+map.touchPitch.disable();
 map.on('dragstart',()=>follow=false);
-map.on('click',e=>{ if(admin) addStation(e.latlng.lat,e.latlng.lng); });
+map.on('click',e=>{ if(admin) addStation(e.lngLat.lat,e.lngLat.lng); });
+const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started?55:0,duration:600});
 
-function meIcon(){return L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[34,34],iconAnchor:[17,17]})}
-function pmIcon(st,i,dim){return L.divIcon({className:'',html:`<div class="pm${dim?' dim':''}"><div class="ring"></div><img src="${ART(st.pokemon)}"><div class="num">${i+1}</div></div>`,iconSize:[64,64],iconAnchor:[32,60]})}
+function el(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
+function pmEl(st,i,dim){return el(`<div class="pm${dim?' dim':''}"><div class="ring"></div><img src="${ART(st.pokemon)}"><div class="num">${i+1}</div></div>`)}
 
 function renderMarkers(){
-  markers.forEach(m=>map.removeLayer(m)); markers=[];
+  markers.forEach(m=>m.remove()); markers=[];
   S.stations.forEach((st,i)=>{
     // ponytail: visitor sees ONLY the next station
     if(!admin && i!==S.progress) return;
-    const m=L.marker([st.lat,st.lng],{icon:pmIcon(st,i,admin&&i<S.progress),draggable:admin}).addTo(map);
-    if(admin) m.on('dragend',e=>{const p=e.target.getLatLng();st.lat=p.lat;st.lng=p.lng;save();renderAll();});
-    else m.on('click',openCode);
+    const e=pmEl(st,i,admin&&i<S.progress);
+    const m=new maplibregl.Marker({element:e,anchor:'bottom',draggable:admin}).setLngLat([st.lng,st.lat]).addTo(map);
+    if(admin) m.on('dragend',()=>{const p=m.getLngLat();st.lat=p.lat;st.lng=p.lng;save();renderAll();});
+    else e.addEventListener('click',openCode);
     markers.push(m);
   });
 }
@@ -216,14 +237,14 @@ function start(){
   started=true; $('lens').classList.add('live');
   navigator.geolocation.watchPosition(p=>{
     me=[p.coords.latitude,p.coords.longitude];
-    if(!meMarker){meMarker=L.marker(me,{icon:meIcon(),zIndexOffset:1000}).addTo(map);accCircle=L.circle(me,{radius:p.coords.accuracy,color:'#2a75bb',weight:1,fillOpacity:.08}).addTo(map);map.setView(me,17);}
-    else{meMarker.setLatLng(me);accCircle.setLatLng(me).setRadius(p.coords.accuracy);if(follow)map.panTo(me);}
+    if(!meMarker){meMarker=new maplibregl.Marker({element:el('<div class="me"></div>')}).setLngLat([me[1],me[0]]).addTo(map);goTo(me,17.5);}
+    else{meMarker.setLngLat([me[1],me[0]]);if(follow)goTo(me);}
     renderHud();
   },e=>{$('banner').textContent='GPS aus? Bitte Standort erlauben.';},{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
   navigator.wakeLock?.request('screen').catch(()=>{});
   renderAll();
 }
-$('locBtn').onclick=()=>{follow=true;if(me)map.setView(me,Math.max(map.getZoom(),17));};
+$('locBtn').onclick=()=>{follow=true;if(me)goTo(me,Math.max(map.getZoom(),17));};
 
 // ---- HUD ----
 function renderHud(){
@@ -271,7 +292,7 @@ $('doneClose').onclick=()=>$('doneOv').classList.remove('on');
 $('gearBtn').onclick=()=>{ if(admin){leaveAdmin();return} $('pinIn').value='';$('pinErr').textContent='';$('pinOv').classList.add('on');setTimeout(()=>$('pinIn').focus(),100); };
 $('pinCancel').onclick=()=>$('pinOv').classList.remove('on');
 $('pinOk').onclick=tryPin; $('pinIn').onkeydown=e=>{if(e.key==='Enter')tryPin()};
-function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on');admin=true;$('admin').classList.add('on');$('gearBtn').textContent='👁️';renderAll();if(S.stations.length)map.fitBounds(S.stations.map(s=>[s.lat,s.lng]),{padding:[40,40],maxZoom:17});} else $('pinErr').textContent='Falsche PIN'; }
+function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on');admin=true;$('admin').classList.add('on');$('gearBtn').textContent='👁️';renderAll();if(S.stations.length){const b=new maplibregl.LngLatBounds();S.stations.forEach(s=>b.extend([s.lng,s.lat]));map.fitBounds(b,{padding:60,maxZoom:17,pitch:0});}} else $('pinErr').textContent='Falsche PIN'; }
 function leaveAdmin(){admin=false;$('admin').classList.remove('on');$('gearBtn').textContent='⚙️';follow=true;renderAll();}
 $('adminDone').onclick=leaveAdmin;
 
@@ -309,7 +330,7 @@ $('bakClose').onclick=()=>$('bakOv').classList.remove('on');
 $('bakLoad').onclick=()=>{try{const j=JSON.parse($('bakText').value);if(!Array.isArray(j.stations))throw 0;S=Object.assign({progress:0,pin:'1234'},j);save();$('bakOv').classList.remove('on');renderAll();}catch{alert('Ungültiges Backup')}};
 
 renderAll();
-if(S.stations.length&&!me) map.setView([S.stations[0].lat,S.stations[0].lng],16);
+if(S.stations.length&&!me) map.jumpTo({center:[S.stations[0].lng,S.stations[0].lat],zoom:16});
 </script>
 </body>
 </html>
