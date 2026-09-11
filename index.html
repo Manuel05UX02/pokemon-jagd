@@ -190,7 +190,7 @@ let admin=false, me=null, follow=true, markers=[], meMarker=null, accCircle=null
 
 // ---- map ----
 const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([51.1657,10.4515],6);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
 map.on('dragstart',()=>follow=false);
 map.on('click',e=>{ if(admin) addStation(e.latlng.lat,e.latlng.lng); });
 
