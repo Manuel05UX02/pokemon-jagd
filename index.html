@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#e3350d">
+<title>Poké-Jagd</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%23e3350d' stroke='%23222' stroke-width='6'/><path d='M4 50h92' stroke='%23222' stroke-width='8'/><path d='M50 96A46 46 0 0 1 4 50h92A46 46 0 0 1 50 96z' fill='white'/><circle cx='50' cy='50' r='14' fill='white' stroke='%23222' stroke-width='6'/></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--red:#e3350d;--red-d:#b0260a;--yellow:#ffcb05;--blue:#2a75bb;--blue-d:#1b4f80;--ink:#1f1f1f;--frame:#2b2b2b;--paper:#fff8e7;--green:#3fbf5a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;font-family:Fredoka,"Segoe UI",system-ui,sans-serif;background:var(--frame);color:var(--ink);user-select:none;-webkit-user-select:none}
+button,input,select{font:inherit}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--red)}
+
+/* ---- Pokédex top ---- */
+.dex-top{flex:none;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;display:flex;align-items:center;gap:10px;background:var(--red);border-bottom:5px solid var(--red-d);box-shadow:0 4px 0 rgba(0,0,0,.25);position:relative;z-index:1000}
+.lens{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#bfe9ff,#2ea3e6 45%,#0e5a97 80%);border:4px solid #fff;box-shadow:0 0 0 3px #222,inset -3px -3px 6px rgba(0,0,0,.35);flex:none;position:relative}
+.lens.live::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:3px solid var(--green);animation:pulse 1.4s infinite}
+@keyframes pulse{0%{transform:scale(.7);opacity:1}100%{transform:scale(1.15);opacity:0}}
+.leds{display:flex;gap:6px}.leds i{width:12px;height:12px;border-radius:50%;border:2px solid #222;display:block}
+.leds i:nth-child(1){background:#ff5d5d}.leds i:nth-child(2){background:#ffe066}.leds i:nth-child(3){background:#6fe08a}
+.dex-title{flex:1;font-weight:700;font-size:22px;color:#fff;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,.35);text-align:center}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:3px solid #222;background:var(--yellow);font-size:22px;display:grid;place-items:center;box-shadow:0 3px 0 #222;cursor:pointer;flex:none}
+.icon-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #222}
+
+/* ---- Map ---- */
+#mapwrap{flex:1;position:relative;margin:8px;border:5px solid #222;border-radius:18px;overflow:hidden;background:#cde;box-shadow:inset 0 0 0 4px #fff}
+#map{position:absolute;inset:0;z-index:1}
+.leaflet-control-attribution{font-size:9px!important;opacity:.7}
+.map-fabs{position:absolute;right:10px;bottom:10px;z-index:500;display:flex;flex-direction:column;gap:8px}
+.banner{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:500;background:var(--paper);border:3px solid #222;border-radius:14px;padding:6px 14px;font-weight:600;font-size:15px;box-shadow:0 3px 0 #222;white-space:nowrap;max-width:92%;overflow:hidden;text-overflow:ellipsis}
+.banner.admin{background:var(--yellow)}
+
+/* markers */
+.pm{position:relative;width:64px;height:64px;filter:drop-shadow(0 4px 3px rgba(0,0,0,.4))}
+.pm img{width:64px;height:64px;object-fit:contain;animation:bob 1.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-6px)}}
+.pm .num{position:absolute;left:-4px;top:-4px;width:24px;height:24px;border-radius:50%;background:var(--yellow);border:3px solid #222;font-weight:700;font-size:13px;display:grid;place-items:center}
+.pm.dim img{opacity:.45;filter:grayscale(1);animation:none}
+.pm .ring{position:absolute;left:50%;bottom:2px;width:40px;height:14px;transform:translateX(-50%);border-radius:50%;background:rgba(255,203,5,.7);border:2px solid #222;z-index:-1}
+.me{width:34px;height:34px;border-radius:50%;background:linear-gradient(#e3350d 0 48%,#222 48% 56%,#fff 56%);border:3px solid #222;box-shadow:0 0 0 4px rgba(42,117,187,.35);position:relative}
+.me::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;background:#fff;border:3px solid #222;transform:translate(-50%,-50%)}
+
+/* ---- Bottom HUD ---- */
+.hud{flex:none;padding:8px 12px calc(env(safe-area-inset-bottom) + 10px);background:var(--red);border-top:5px solid var(--red-d);display:flex;flex-direction:column;gap:8px;z-index:1000}
+.dexbar{display:flex;gap:6px;justify-content:center}
+.slot{width:46px;height:46px;border-radius:12px;background:#fff;border:3px solid #222;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 0 0 2px var(--paper)}
+.slot img{width:40px;height:40px}.slot.q{color:#999;font-weight:700;font-size:20px}.slot.next{border-color:var(--yellow);box-shadow:0 0 0 3px var(--yellow)}
+.screen{background:#8ee36a;border:3px solid #222;border-radius:12px;padding:8px 12px;font-weight:600;font-size:16px;display:flex;align-items:center;gap:10px;min-height:48px;box-shadow:inset 0 0 0 3px #b7f0a0}
+.screen img{width:36px;height:36px}.screen .grow{flex:1}.screen small{display:block;font-weight:400;font-size:13px;opacity:.8}
+.btn{border:3px solid #222;border-radius:14px;padding:12px 18px;font-weight:700;font-size:18px;background:var(--yellow);color:var(--ink);box-shadow:0 4px 0 #222;cursor:pointer;width:100%}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #222}
+.btn.blue{background:var(--blue);color:#fff}.btn.grey{background:#ddd}.btn.sm{padding:8px 12px;font-size:15px;width:auto}
+.btn:disabled{opacity:.5;pointer-events:none}
+
+/* ---- Overlays ---- */
+.ov{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px}
+.ov.on{display:flex}
+.card{background:var(--paper);border:5px solid #222;border-radius:22px;padding:20px;width:min(420px,100%);max-height:92vh;overflow:auto;text-align:center;box-shadow:0 8px 0 #222;animation:pop .25s}
+@keyframes pop{from{transform:scale(.8);opacity:0}}
+.card h2{margin:0 0 6px;font-size:24px}.card p{margin:6px 0 14px}
+.card img.big{width:150px;height:150px;object-fit:contain}
+.code{font-size:30px;letter-spacing:6px;text-align:center;width:100%;padding:10px;border:4px solid var(--blue);border-radius:14px;background:#fff;text-transform:uppercase;font-weight:700}
+.code:focus{outline:none;border-color:var(--yellow)}
+.shake{animation:shake .4s}
+@keyframes shake{20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
+.err{color:var(--red);font-weight:600;min-height:22px;margin:6px 0}
+.row{display:flex;gap:8px;margin-top:10px}.row .btn{flex:1}
+.stars{position:relative;height:0}.stars i{position:absolute;left:50%;top:0;font-size:28px;animation:fly 1.2s ease-out forwards}
+@keyframes fly{to{transform:translate(var(--x),var(--y)) rotate(360deg);opacity:0}}
+.caught{font-size:34px;font-weight:700;color:var(--blue);text-shadow:3px 3px 0 var(--yellow)}
+
+/* ---- Admin sheet ---- */
+#admin{position:fixed;left:0;right:0;bottom:0;z-index:1500;background:var(--paper);border-top:5px solid #222;border-radius:22px 22px 0 0;max-height:62vh;display:none;flex-direction:column;box-shadow:0 -6px 0 rgba(0,0,0,.25)}
+#admin.on{display:flex}
+#admin header{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:2px dashed #ccc;font-weight:700}
+#admin header .grow{flex:1}
+#stations{overflow:auto;padding:8px 12px;flex:1}
+.st{display:grid;grid-template-columns:36px 44px 1fr auto;gap:6px;align-items:center;background:#fff;border:3px solid #222;border-radius:14px;padding:6px;margin-bottom:8px}
+.st .n{font-weight:700;font-size:20px;text-align:center}
+.st img{width:44px;height:44px}
+.st .fields{display:flex;flex-direction:column;gap:4px;min-width:0}
+.st input,.st select{width:100%;padding:5px 8px;border:2px solid #999;border-radius:8px;background:#fff}
+.st .ctl{display:flex;flex-direction:column;gap:3px}
+.st .ctl button{width:32px;height:26px;border:2px solid #222;border-radius:6px;background:var(--yellow);font-size:13px;cursor:pointer;line-height:1}
+.st .ctl button.del{background:#ff8a80}
+.admin-actions{padding:8px 12px calc(env(safe-area-inset-bottom) + 8px);display:flex;gap:8px;flex-wrap:wrap;border-top:2px dashed #ccc}
+.admin-actions .btn{flex:1;font-size:14px;padding:9px 6px}
+.hint{font-size:13px;color:#555;padding:0 14px 6px}
+textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-radius:8px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="dex-top">
+    <div class="lens" id="lens"></div>
+    <div class="leds"><i></i><i></i><i></i></div>
+    <div class="dex-title">POKÉ-JAGD</div>
+    <button class="icon-btn" id="gearBtn" title="Admin">⚙️</button>
+  </div>
+
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div class="banner" id="banner">Tippe auf ▶ um zu starten</div>
+    <div class="map-fabs">
+      <button class="icon-btn" id="locBtn" title="Zu mir">🎯</button>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="dexbar" id="dexbar"></div>
+    <div class="screen" id="screen"><span class="grow">Lade…</span></div>
+    <button class="btn" id="mainBtn">▶ Los geht's!</button>
+  </div>
+</div>
+
+<!-- Code eingeben -->
+<div class="ov" id="codeOv"><div class="card">
+  <img class="big" id="codeImg" alt="">
+  <h2 id="codeTitle">Wildes Pokémon!</h2>
+  <p>Gib den geheimen Code ein, um es zu fangen:</p>
+  <input class="code" id="codeIn" inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="12" placeholder="CODE">
+  <div class="err" id="codeErr"></div>
+  <div class="row"><button class="btn grey" id="codeCancel">Zurück</button><button class="btn blue" id="codeOk">Fangen!</button></div>
+</div></div>
+
+<!-- Erfolg -->
+<div class="ov" id="winOv"><div class="card">
+  <div class="stars" id="stars"></div>
+  <img class="big" id="winImg" alt="">
+  <div class="caught">GEFANGEN!</div>
+  <p id="winText"></p>
+  <button class="btn" id="winNext">Weiter ➜</button>
+</div></div>
+
+<!-- Alles geschafft -->
+<div class="ov" id="doneOv"><div class="card">
+  <h2>🏆 Pokémon-Meister!</h2>
+  <p>Ihr habt alle Pokémon gefangen!</p>
+  <div class="dexbar" id="doneBar" style="flex-wrap:wrap;margin-bottom:14px"></div>
+  <button class="btn" id="doneClose">Super!</button>
+</div></div>
+
+<!-- PIN -->
+<div class="ov" id="pinOv"><div class="card">
+  <h2>🔒 Admin-PIN</h2>
+  <input class="code" id="pinIn" inputmode="numeric" maxlength="8" placeholder="PIN">
+  <div class="err" id="pinErr"></div>
+  <div class="row"><button class="btn grey" id="pinCancel">Zurück</button><button class="btn blue" id="pinOk">OK</button></div>
+</div></div>
+
+<!-- Backup -->
+<div class="ov" id="bakOv"><div class="card">
+  <h2>💾 Backup</h2>
+  <p>Text kopieren und sicher aufheben – oder einfügen und „Laden“ drücken.</p>
+  <textarea id="bakText"></textarea>
+  <div class="row"><button class="btn grey" id="bakClose">Zurück</button><button class="btn blue" id="bakLoad">Laden</button></div>
+</div></div>
+
+<!-- Admin sheet -->
+<div id="admin">
+  <header><span>🛠️ Admin</span><span class="grow"></span>
+    <button class="btn sm" id="addHere">📍 Hier setzen</button>
+    <button class="btn sm blue" id="adminDone">Fertig ✓</button></header>
+  <div class="hint">Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge.</div>
+  <div id="stations"></div>
+  <div class="admin-actions">
+    <button class="btn grey" id="resetProg">🔄 Fortschritt zurücksetzen</button>
+    <button class="btn grey" id="backupBtn">💾 Backup</button>
+    <button class="btn grey" id="pinChange">🔒 PIN ändern</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const NAMES=["Bisasam","Bisaknosp","Bisaflor","Glumanda","Glutexo","Glurak","Schiggy","Schillok","Turtok","Raupy","Safcon","Smettbo","Hornliu","Kokuna","Bibor","Taubsi","Tauboga","Tauboss","Rattfratz","Rattikarl","Habitak","Ibitak","Rettan","Arbok","Pikachu","Raichu","Sandan","Sandamer","Nidoran♀","Nidorina","Nidoqueen","Nidoran♂","Nidorino","Nidoking","Piepi","Pixi","Vulpix","Vulnona","Pummeluff","Knuddeluff","Zubat","Golbat","Myrapla","Duflor","Giflor","Paras","Parasek","Bluzuk","Omot","Digda","Digdri","Mauzi","Snobilikat","Enton","Entoron","Menki","Rasaff","Fukano","Arkani","Quapsel","Quaputzi","Quappo","Abra","Kadabra","Simsala","Machollo","Maschock","Machomei","Knofensa","Ultrigaria","Sarzenia","Tentacha","Tentoxa","Kleinstein","Georok","Geowaz","Ponita","Gallopa","Flegmon","Lahmus","Magnetilo","Magneton","Porenta","Dodu","Dodri","Jurob","Jugong","Sleima","Sleimok","Muschas","Austos","Nebulak","Alpollo","Gengar","Onix","Traumato","Hypno","Krabby","Kingler","Voltobal","Lektrobal","Owei","Kokowei","Tragosso","Knogga","Kicklee","Nockchan","Schlurp","Smogon","Smogmog","Rihorn","Rizeros","Chaneira","Tangela","Kangama","Seeper","Seemon","Goldini","Golking","Sterndu","Starmie","Pantimos","Sichlor","Rossana","Elektek","Magmar","Pinsir","Tauros","Karpador","Garados","Lapras","Ditto","Evoli","Aquana","Blitza","Flamara","Porygon","Amonitas","Amoroso","Kabuto","Kabutops","Aerodactyl","Relaxo","Arktos","Zapdos","Lavados","Dratini","Dragonir","Dragoran","Mewtu","Mew"];
+const ART=id=>`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+const SPR=id=>`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+const $=id=>document.getElementById(id);
+
+// ---- state (ponytail: localStorage, same device for admin + kids) ----
+const KEY='pokejagd';
+let S=Object.assign({stations:[],progress:0,pin:'1234'},JSON.parse(localStorage.getItem(KEY)||'{}'));
+const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+let admin=false, me=null, follow=true, markers=[], meMarker=null, accCircle=null, started=false;
+
+// ---- map ----
+const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([51.1657,10.4515],6);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+map.on('dragstart',()=>follow=false);
+map.on('click',e=>{ if(admin) addStation(e.latlng.lat,e.latlng.lng); });
+
+function meIcon(){return L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[34,34],iconAnchor:[17,17]})}
+function pmIcon(st,i,dim){return L.divIcon({className:'',html:`<div class="pm${dim?' dim':''}"><div class="ring"></div><img src="${ART(st.pokemon)}"><div class="num">${i+1}</div></div>`,iconSize:[64,64],iconAnchor:[32,60]})}
+
+function renderMarkers(){
+  markers.forEach(m=>map.removeLayer(m)); markers=[];
+  S.stations.forEach((st,i)=>{
+    // ponytail: visitor sees ONLY the next station
+    if(!admin && i!==S.progress) return;
+    const m=L.marker([st.lat,st.lng],{icon:pmIcon(st,i,admin&&i<S.progress),draggable:admin}).addTo(map);
+    if(admin) m.on('dragend',e=>{const p=e.target.getLatLng();st.lat=p.lat;st.lng=p.lng;save();renderAll();});
+    else m.on('click',openCode);
+    markers.push(m);
+  });
+}
+
+// ---- geolocation ----
+function dist(a,b,c,d){const r=6371000,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,h=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return 2*r*Math.asin(Math.sqrt(h))}
+function start(){
+  if(!navigator.geolocation){alert('Kein GPS verfügbar');return}
+  started=true; $('lens').classList.add('live');
+  navigator.geolocation.watchPosition(p=>{
+    me=[p.coords.latitude,p.coords.longitude];
+    if(!meMarker){meMarker=L.marker(me,{icon:meIcon(),zIndexOffset:1000}).addTo(map);accCircle=L.circle(me,{radius:p.coords.accuracy,color:'#2a75bb',weight:1,fillOpacity:.08}).addTo(map);map.setView(me,17);}
+    else{meMarker.setLatLng(me);accCircle.setLatLng(me).setRadius(p.coords.accuracy);if(follow)map.panTo(me);}
+    renderHud();
+  },e=>{$('banner').textContent='GPS aus? Bitte Standort erlauben.';},{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+  navigator.wakeLock?.request('screen').catch(()=>{});
+  renderAll();
+}
+$('locBtn').onclick=()=>{follow=true;if(me)map.setView(me,Math.max(map.getZoom(),17));};
+
+// ---- HUD ----
+function renderHud(){
+  const n=S.stations.length, next=S.stations[S.progress];
+  $('dexbar').innerHTML=S.stations.map((st,i)=>i<S.progress?`<div class="slot"><img src="${SPR(st.pokemon)}"></div>`:`<div class="slot q${i===S.progress?' next':''}">?</div>`).join('');
+  const b=$('banner'), sc=$('screen'), mb=$('mainBtn');
+  if(admin){b.className='banner admin';b.textContent='🛠️ Admin-Modus';sc.innerHTML='<span class="grow">Stationen: '+n+'</span>';mb.style.display='none';return}
+  b.className='banner'; mb.style.display='';
+  if(!started){b.textContent='Tippe auf ▶ um zu starten';sc.innerHTML='<span class="grow">Bereit für die Jagd?</span>';mb.textContent='▶ Los geht\'s!';mb.onclick=start;return}
+  if(!n){b.textContent='Noch keine Stationen';sc.innerHTML='<span class="grow">Der Admin muss erst Stationen setzen.</span>';mb.style.display='none';return}
+  if(!next){b.textContent='🏆 Alle gefangen!';sc.innerHTML='<span class="grow">Pokémon-Meister! 🎉</span>';mb.textContent='🏆 Nochmal anschauen';mb.onclick=showDone;return}
+  const d=me?Math.round(dist(me[0],me[1],next.lat,next.lng)):null;
+  b.textContent=`Station ${S.progress+1} von ${n}`;
+  sc.innerHTML=`<img src="${SPR(next.pokemon)}"><span class="grow">Ein wildes ${NAMES[next.pokemon-1]}!<small>${d===null?'Suche GPS…':d<25?'🔥 Du bist ganz nah!':d<80?'🌡️ Warm… fast da!':'📍 noch '+d+' m'}</small></span>`;
+  mb.textContent='🔑 Code eingeben'; mb.onclick=openCode;
+}
+function renderAll(){renderMarkers();renderHud();if(admin)renderAdmin();}
+
+// ---- code overlay ----
+function openCode(){
+  const st=S.stations[S.progress]; if(!st||admin)return;
+  $('codeImg').src=ART(st.pokemon); $('codeTitle').textContent=`Ein wildes ${NAMES[st.pokemon-1]}!`;
+  $('codeIn').value=''; $('codeErr').textContent=''; $('codeOv').classList.add('on'); setTimeout(()=>$('codeIn').focus(),100);
+}
+$('codeCancel').onclick=()=>$('codeOv').classList.remove('on');
+$('codeOk').onclick=checkCode; $('codeIn').onkeydown=e=>{if(e.key==='Enter')checkCode()};
+function checkCode(){
+  const st=S.stations[S.progress], v=$('codeIn').value.trim().toLowerCase();
+  if(v && v===String(st.code||'').trim().toLowerCase()){
+    $('codeOv').classList.remove('on'); S.progress++; save();
+    $('winImg').src=ART(st.pokemon); $('winText').textContent=`${NAMES[st.pokemon-1]} ist jetzt in deinem Pokédex!`;
+    $('stars').innerHTML=Array.from({length:12},(_,i)=>`<i style="--x:${(Math.random()*300-150)|0}px;--y:${(Math.random()*-220-40)|0}px;animation-delay:${i*40}ms">${['⭐','✨','🌟'][i%3]}</i>`).join('');
+    $('winOv').classList.add('on'); renderAll();
+  } else {
+    $('codeErr').textContent='Hmm, das war nicht richtig. Versuch\'s nochmal!';
+    const c=$('codeOv').firstElementChild; c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+    $('codeIn').value=''; $('codeIn').focus();
+  }
+}
+$('winNext').onclick=()=>{$('winOv').classList.remove('on'); if(S.progress>=S.stations.length)showDone(); else follow=true;};
+function showDone(){$('doneBar').innerHTML=S.stations.map(st=>`<div class="slot"><img src="${SPR(st.pokemon)}"></div>`).join('');$('doneOv').classList.add('on');}
+$('doneClose').onclick=()=>$('doneOv').classList.remove('on');
+
+// ---- admin ----
+$('gearBtn').onclick=()=>{ if(admin){leaveAdmin();return} $('pinIn').value='';$('pinErr').textContent='';$('pinOv').classList.add('on');setTimeout(()=>$('pinIn').focus(),100); };
+$('pinCancel').onclick=()=>$('pinOv').classList.remove('on');
+$('pinOk').onclick=tryPin; $('pinIn').onkeydown=e=>{if(e.key==='Enter')tryPin()};
+function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on');admin=true;$('admin').classList.add('on');$('gearBtn').textContent='👁️';renderAll();if(S.stations.length)map.fitBounds(S.stations.map(s=>[s.lat,s.lng]),{padding:[40,40],maxZoom:17});} else $('pinErr').textContent='Falsche PIN'; }
+function leaveAdmin(){admin=false;$('admin').classList.remove('on');$('gearBtn').textContent='⚙️';follow=true;renderAll();}
+$('adminDone').onclick=leaveAdmin;
+
+function addStation(lat,lng){
+  S.stations.push({lat,lng,pokemon:[25,1,4,7,133,39,143,54][S.stations.length%8],code:String(1000+Math.floor(Math.random()*9000))});
+  save(); renderAll(); $('stations').scrollTop=1e9;
+}
+$('addHere').onclick=()=>{ if(!me){alert('Noch keine GPS-Position. Erst ▶ starten (Admin verlassen), dann zurückkommen.');return} addStation(me[0],me[1]); };
+
+function renderAdmin(){
+  const opts=NAMES.map((n,i)=>`<option value="${i+1}">#${i+1} ${n}</option>`).join('');
+  $('stations').innerHTML=S.stations.map((st,i)=>`<div class="st">
+    <div class="n">${i+1}</div><img src="${SPR(st.pokemon)}">
+    <div class="fields">
+      <select data-i="${i}" data-k="pokemon">${opts}</select>
+      <input data-i="${i}" data-k="code" value="${st.code||''}" placeholder="Geheim-Code" autocapitalize="characters">
+    </div>
+    <div class="ctl"><button data-i="${i}" data-a="up">▲</button><button data-i="${i}" data-a="down">▼</button><button class="del" data-i="${i}" data-a="del">✕</button></div>
+  </div>`).join('') || '<p style="text-align:center;color:#777">Noch keine Stationen. Tippe auf die Karte!</p>';
+  $('stations').querySelectorAll('select').forEach((s,i)=>s.value=S.stations[i].pokemon);
+}
+$('stations').addEventListener('change',e=>{const t=e.target,i=+t.dataset.i;if(t.dataset.k==='pokemon')S.stations[i].pokemon=+t.value;else S.stations[i].code=t.value;save();renderMarkers();if(t.tagName==='SELECT')renderAdmin();});
+$('stations').addEventListener('input',e=>{const t=e.target;if(t.dataset.k==='code'){S.stations[+t.dataset.i].code=t.value;save();}});
+$('stations').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;const i=+b.dataset.i,a=b.dataset.a,s=S.stations;
+  if(a==='del'){if(!confirm(`Station ${i+1} löschen?`))return;s.splice(i,1);}
+  if(a==='up'&&i>0)[s[i-1],s[i]]=[s[i],s[i-1]];
+  if(a==='down'&&i<s.length-1)[s[i+1],s[i]]=[s[i],s[i+1]];
+  if(S.progress>s.length)S.progress=s.length; save();renderAll();
+});
+$('resetProg').onclick=()=>{if(confirm('Fortschritt auf Station 1 zurücksetzen?')){S.progress=0;save();renderAll();}};
+$('pinChange').onclick=()=>{const p=prompt('Neue Admin-PIN:',S.pin);if(p&&p.trim()){S.pin=p.trim();save();}};
+$('backupBtn').onclick=()=>{$('bakText').value=JSON.stringify(S);$('bakOv').classList.add('on');};
+$('bakClose').onclick=()=>$('bakOv').classList.remove('on');
+$('bakLoad').onclick=()=>{try{const j=JSON.parse($('bakText').value);if(!Array.isArray(j.stations))throw 0;S=Object.assign({progress:0,pin:'1234'},j);save();$('bakOv').classList.remove('on');renderAll();}catch{alert('Ungültiges Backup')}};
+
+renderAll();
+if(S.stations.length&&!me) map.setView([S.stations[0].lat,S.stations[0].lng],16);
+</script>
+</body>
+</html>
