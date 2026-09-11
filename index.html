@@ -211,6 +211,7 @@ const PAL={
  classic:{G:'#79d27f',G2:'#5fc46e',G3:'#96e48c',PITCH:'#b3f29a',ROAD:'#fbf7ea',ROAD2:'#d9e9c9',PATH:'#fff',WATER:'#5cc8f5',BLDG:'#e6ecdc',RAIL:'#b8d3aa',LBL:'#2f6b3a',HALO:'#fff',PH:'#2f6b3a'},
  go:{G:'#5fae7c',G2:'#4c9a66',G3:'#79c98a',PITCH:'#8fd68f',ROAD:'#edf2ee',ROAD2:'#bfd0c4',PATH:'#dfe9e0',WATER:'#63c4f0',BLDG:'#d3e0e6',RAIL:'#a9bfb0',LBL:'#fff',HALO:'#3d7a55',PH:'#3d7a55'}
 };
+const road=(id,cls,w,color,extra={})=>({id,type:'line',source:'omt','source-layer':'transportation',filter:['all',['in','class',...cls],['!=','brunnel','tunnel']],layout:{'line-cap':'round','line-join':'round'},paint:Object.assign({'line-color':color,'line-width':['interpolate',['exponential',1.5],['zoom'],12,w[0],18,w[1]]},extra)});
 const STYLE=({G,G2,G3,PITCH,ROAD,ROAD2,PATH,WATER,BLDG,RAIL,LBL,HALO,PH})=>({version:8,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
  sources:{omt:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'© OpenStreetMap © OpenFreeMap'}},
  layers:[
