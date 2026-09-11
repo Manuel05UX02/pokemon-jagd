@@ -10,7 +10,11 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.0/dist/maplibre-gl.css">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--red:#e3350d;--red-d:#b0260a;--yellow:#ffcb05;--blue:#2a75bb;--blue-d:#1b4f80;--ink:#1f1f1f;--frame:#2b2b2b;--paper:#fff8e7;--green:#3fbf5a}
+:root{--logo-blue:#3c5aa6;--red:#e3350d;--red-d:#b0260a;--yellow:#ffcb05;--blue:#2a75bb;--blue-d:#1b4f80;--ink:#1f1f1f;--frame:#2b2b2b;--paper:#fff8e7;--green:#3fbf5a}
+/* Pokéball-Muster für Rahmen (data-URI, dezent) */
+.pokeballs{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23000' stroke-width='2.5' opacity='.13'%3E%3Ccircle cx='20' cy='20' r='11'/%3E%3Cpath d='M9 20h22'/%3E%3Ccircle cx='20' cy='20' r='3.5' fill='%23000'/%3E%3C/g%3E%3C/svg%3E");background-size:40px 40px}
+/* Logo-Look: gelb mit blauer Kontur wie das Pokémon-Logo */
+.logo{color:var(--yellow);-webkit-text-stroke:2px var(--logo-blue);paint-order:stroke fill;text-shadow:3px 3px 0 var(--logo-blue);font-weight:700;letter-spacing:1px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;font-family:Fredoka,"Segoe UI",system-ui,sans-serif;background:var(--frame);color:var(--ink);user-select:none;-webkit-user-select:none}
 button,input,select{font:inherit}
@@ -23,7 +27,7 @@ button,input,select{font:inherit}
 @keyframes pulse{0%{transform:scale(.7);opacity:1}100%{transform:scale(1.15);opacity:0}}
 .leds{display:flex;gap:6px}.leds i{width:12px;height:12px;border-radius:50%;border:2px solid #222;display:block}
 .leds i:nth-child(1){background:#ff5d5d}.leds i:nth-child(2){background:#ffe066}.leds i:nth-child(3){background:#6fe08a}
-.dex-title{flex:1;font-weight:700;font-size:22px;color:#fff;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,.35);text-align:center}
+.dex-title{flex:1;font-size:26px;text-align:center;-webkit-text-stroke-width:1.5px}
 .icon-btn{width:44px;height:44px;border-radius:12px;border:3px solid #222;background:var(--yellow);font-size:22px;display:grid;place-items:center;box-shadow:0 3px 0 #222;cursor:pointer;flex:none}
 .icon-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #222}
 
@@ -50,7 +54,8 @@ button,input,select{font:inherit}
 .hud{flex:none;padding:8px 12px calc(env(safe-area-inset-bottom) + 10px);background:var(--red);border-top:5px solid var(--red-d);display:flex;flex-direction:column;gap:8px;z-index:1000}
 .dexbar{display:flex;gap:6px;justify-content:center}
 .slot{width:46px;height:46px;border-radius:12px;background:#fff;border:3px solid #222;display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 0 0 2px var(--paper)}
-.slot img{width:40px;height:40px}.slot.q{color:#999;font-weight:700;font-size:20px}.slot.next{border-color:var(--yellow);box-shadow:0 0 0 3px var(--yellow)}
+.slot img{width:40px;height:40px}.slot.q{color:transparent;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23bbb' stroke='%23888' stroke-width='6'/%3E%3Cpath d='M10 50h80' stroke='%23888' stroke-width='7'/%3E%3Cpath d='M50 90A40 40 0 0 1 10 50h80A40 40 0 0 1 50 90z' fill='%23eee'/%3E%3Ccircle cx='50' cy='50' r='11' fill='%23eee' stroke='%23888' stroke-width='6'/%3E%3C/svg%3E") center/32px no-repeat}
+.slot.next{background-color:#fff8d6}.slot.next{border-color:var(--yellow);box-shadow:0 0 0 3px var(--yellow)}
 .screen{background:#8ee36a;border:3px solid #222;border-radius:12px;padding:8px 12px;font-weight:600;font-size:16px;display:flex;align-items:center;gap:10px;min-height:48px;box-shadow:inset 0 0 0 3px #b7f0a0}
 .screen img{width:36px;height:36px}.screen .grow{flex:1}.screen small{display:block;font-weight:400;font-size:13px;opacity:.8}
 .btn{border:3px solid #222;border-radius:14px;padding:12px 18px;font-weight:700;font-size:18px;background:var(--yellow);color:var(--ink);box-shadow:0 4px 0 #222;cursor:pointer;width:100%}
@@ -73,7 +78,13 @@ button,input,select{font:inherit}
 .row{display:flex;gap:8px;margin-top:10px}.row .btn{flex:1}
 .stars{position:relative;height:0}.stars i{position:absolute;left:50%;top:0;font-size:28px;animation:fly 1.2s ease-out forwards}
 @keyframes fly{to{transform:translate(var(--x),var(--y)) rotate(360deg);opacity:0}}
-.caught{font-size:34px;font-weight:700;color:var(--blue);text-shadow:3px 3px 0 var(--yellow)}
+.caught{font-size:36px}
+.card h2.logo{font-size:28px;-webkit-text-stroke-width:1.5px}
+/* Fang-Animation: Pokéball wackelt 3x, dann Klick, dann Pokémon */
+.ball{width:120px;height:120px;margin:10px auto;border-radius:50%;background:linear-gradient(#e3350d 0 47%,#222 47% 55%,#fff 55%);border:5px solid #222;position:relative;transform-origin:50% 90%;animation:wobble 2.1s ease-in-out}
+.ball::after{content:"";position:absolute;left:50%;top:50%;width:28px;height:28px;border-radius:50%;background:#fff;border:6px solid #222;transform:translate(-50%,-50%)}
+@keyframes wobble{0%,100%{transform:rotate(0)}12%{transform:rotate(-22deg)}24%{transform:rotate(22deg)}36%{transform:rotate(0)}48%{transform:rotate(-22deg)}60%{transform:rotate(22deg)}72%{transform:rotate(0)}82%{transform:rotate(-14deg)}92%{transform:rotate(14deg)}}
+.win-done .ball{display:none}.win-wait .reveal{display:none}
 
 /* ---- Admin sheet ---- */
 #admin{position:fixed;left:0;right:0;bottom:0;z-index:1500;background:var(--paper);border-top:5px solid #222;border-radius:22px 22px 0 0;max-height:62vh;display:none;flex-direction:column;box-shadow:0 -6px 0 rgba(0,0,0,.25)}
@@ -103,10 +114,10 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
 </head>
 <body>
 <div id="app">
-  <div class="dex-top">
+  <div class="dex-top pokeballs">
     <div class="lens" id="lens"></div>
     <div class="leds"><i></i><i></i><i></i></div>
-    <div class="dex-title">POKÉ-JAGD</div>
+    <div class="dex-title logo">POKÉ-JAGD</div>
     <button class="icon-btn" id="gearBtn" title="Admin">⚙️</button>
   </div>
 
@@ -118,7 +129,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
     </div>
   </div>
 
-  <div class="hud">
+  <div class="hud pokeballs">
     <div class="dexbar" id="dexbar"></div>
     <div class="screen" id="screen"><span class="grow">Lade…</span></div>
     <button class="btn" id="mainBtn">▶ Los geht's!</button>
@@ -128,7 +139,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
 <!-- Code eingeben -->
 <div class="ov" id="codeOv"><div class="card">
   <img class="big" id="codeImg" alt="">
-  <h2 id="codeTitle">Wildes Pokémon!</h2>
+  <h2 id="codeTitle" class="logo">Wildes Pokémon!</h2>
   <p>Gib den geheimen Code ein, um es zu fangen:</p>
   <input class="code" id="codeIn" inputmode="text" autocomplete="off" autocapitalize="characters" maxlength="12" placeholder="CODE">
   <div class="err" id="codeErr"></div>
@@ -137,16 +148,19 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
 
 <!-- Erfolg -->
 <div class="ov" id="winOv"><div class="card">
-  <div class="stars" id="stars"></div>
-  <img class="big" id="winImg" alt="">
-  <div class="caught">GEFANGEN!</div>
-  <p id="winText"></p>
-  <button class="btn" id="winNext">Weiter ➜</button>
+  <div class="ball"></div>
+  <div class="reveal">
+    <div class="stars" id="stars"></div>
+    <img class="big" id="winImg" alt="">
+    <div class="caught logo">GEFANGEN!</div>
+    <p id="winText"></p>
+    <button class="btn" id="winNext">Weiter ➜</button>
+  </div>
 </div></div>
 
 <!-- Alles geschafft -->
 <div class="ov" id="doneOv"><div class="card">
-  <h2>🏆 Pokémon-Meister!</h2>
+  <h2 class="logo">Pokémon-Meister!</h2>
   <p>Ihr habt alle Pokémon gefangen!</p>
   <div class="dexbar" id="doneBar" style="flex-wrap:wrap;margin-bottom:14px"></div>
   <button class="btn" id="doneClose">Super!</button>
@@ -187,7 +201,6 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
     <button class="btn grey" id="resetProg">🔄 Fortschritt zurücksetzen</button>
     <button class="btn grey" id="backupBtn">💾 Backup</button>
     <button class="btn grey" id="pinChange">🔒 PIN ändern</button>
-    <button class="btn grey" id="mapStyleBtn">🗺️ Karte</button>
   </div>
 </div>
 
@@ -200,16 +213,12 @@ const $=id=>document.getElementById(id);
 
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
-let S=Object.assign({stations:[],progress:0,pin:'1234',mapStyle:'classic'},JSON.parse(localStorage.getItem(KEY)||'{}'));
+let S=Object.assign({stations:[],progress:0,pin:'1234'},JSON.parse(localStorage.getItem(KEY)||'{}'));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 let admin=false, me=null, follow=true, markers=[], meMarker=null, started=false;
 
 // ---- map (ponytail: OpenFreeMap vector tiles, no API key; Pokémon-Go-Farben) ----
-// ponytail: zwei Paletten, gleiche Layer. 'classic' = knallig, 'go' = näher am echten Pokémon-Go-Look (kühleres Grün, graue Straßen, bläuliche Gebäude)
-const PAL={
- classic:{G:'#79d27f',G2:'#5fc46e',G3:'#96e48c',PITCH:'#b3f29a',ROAD:'#fbf7ea',ROAD2:'#d9e9c9',PATH:'#fff',WATER:'#5cc8f5',BLDG:'#e6ecdc',RAIL:'#b8d3aa',LBL:'#2f6b3a',HALO:'#fff',PH:'#2f6b3a'},
- go:{G:'#5fae7c',G2:'#4c9a66',G3:'#79c98a',PITCH:'#8fd68f',ROAD:'#edf2ee',ROAD2:'#bfd0c4',PATH:'#dfe9e0',WATER:'#63c4f0',BLDG:'#d3e0e6',RAIL:'#a9bfb0',LBL:'#fff',HALO:'#3d7a55',PH:'#3d7a55'}
-};
+const PAL={G:'#79d27f',G2:'#5fc46e',G3:'#96e48c',PITCH:'#b3f29a',ROAD:'#fbf7ea',ROAD2:'#d9e9c9',PATH:'#fff',WATER:'#5cc8f5',BLDG:'#e6ecdc',RAIL:'#b8d3aa',LBL:'#2f6b3a',HALO:'#fff',PH:'#2f6b3a'};
 const road=(id,cls,w,color,extra={})=>({id,type:'line',source:'omt','source-layer':'transportation',filter:['all',['in','class',...cls],['!=','brunnel','tunnel']],layout:{'line-cap':'round','line-join':'round'},paint:Object.assign({'line-color':color,'line-width':['interpolate',['exponential',1.5],['zoom'],12,w[0],18,w[1]]},extra)});
 const STYLE=({G,G2,G3,PITCH,ROAD,ROAD2,PATH,WATER,BLDG,RAIL,LBL,HALO,PH})=>({version:8,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
  sources:{omt:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'© OpenStreetMap © OpenFreeMap'}},
@@ -228,7 +237,7 @@ const STYLE=({G,G2,G3,PITCH,ROAD,ROAD2,PATH,WATER,BLDG,RAIL,LBL,HALO,PH})=>({ver
   {id:'street_lbl',type:'symbol',source:'omt','source-layer':'transportation_name',minzoom:15,layout:{'symbol-placement':'line','text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':11},paint:{'text-color':LBL,'text-halo-color':HALO,'text-halo-width':1.5}},
   {id:'place_lbl',type:'symbol',source:'omt','source-layer':'place',filter:['in','class','city','town','village','suburb','neighbourhood'],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',18,'town',15,13]},paint:{'text-color':'#fff','text-halo-color':PH,'text-halo-width':2}}
  ]});
-const map=new maplibregl.Map({container:'map',style:STYLE(PAL[S.mapStyle]||PAL.classic),center:[10.4515,51.1657],zoom:5,pitch:0,attributionControl:{compact:true}});
+const map=new maplibregl.Map({container:'map',style:STYLE(PAL),center:[10.4515,51.1657],zoom:5,pitch:0,attributionControl:{compact:true}});
 map.touchPitch.disable();
 map.on('dragstart',()=>follow=false);
 map.on('rotatestart',e=>{if(e.originalEvent)follow=false;});
@@ -321,7 +330,9 @@ function checkCode(){
     $('codeOv').classList.remove('on'); S.progress++; save();
     $('winImg').src=ART(st.pokemon); $('winText').textContent=`${NAMES[st.pokemon-1]} ist jetzt in deinem Pokédex!`;
     $('stars').innerHTML=Array.from({length:12},(_,i)=>`<i style="--x:${(Math.random()*300-150)|0}px;--y:${(Math.random()*-220-40)|0}px;animation-delay:${i*40}ms">${['⭐','✨','🌟'][i%3]}</i>`).join('');
-    $('winOv').classList.add('on'); renderAll();
+    const card=$('winOv').firstElementChild; card.className='card win-wait'; $('winOv').classList.add('on'); renderAll();
+    card.querySelector('.ball').style.animation='none'; void card.offsetWidth; card.querySelector('.ball').style.animation='';
+    setTimeout(()=>{card.className='card win-done';},2100);
   } else {
     $('codeErr').textContent='Hmm, das war nicht richtig. Versuch\'s nochmal!';
     const c=$('codeOv').firstElementChild; c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
@@ -366,7 +377,7 @@ function filterPick(){const q=$('pickSearch').value.trim().toLowerCase();$('pick
 $('pickSearch').oninput=filterPick;
 $('pickClose').onclick=()=>$('pickOv').classList.remove('on');
 $('pickGrid').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.stations[pickFor].pokemon=+b.dataset.id;save();$('pickOv').classList.remove('on');renderAll();};
-$('mapStyleBtn').onclick=()=>{S.mapStyle=S.mapStyle==='go'?'classic':'go';save();map.setStyle(STYLE(PAL[S.mapStyle]));};
+
 $('stations').addEventListener('input',e=>{const t=e.target;if(t.dataset.k==='code'){S.stations[+t.dataset.i].code=t.value;save();}});
 $('stations').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const i=+b.dataset.i,a=b.dataset.a,s=S.stations;
