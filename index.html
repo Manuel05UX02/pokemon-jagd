@@ -43,6 +43,8 @@ button,input,select{font:inherit}
 .pm.dim img{opacity:.45;filter:grayscale(1);animation:none}
 .pm .ring{position:absolute;left:50%;bottom:2px;width:40px;height:14px;transform:translateX(-50%);border-radius:50%;background:rgba(255,203,5,.7);border:2px solid #222;z-index:-1}
 .me{width:34px;height:34px;border-radius:50%;background:linear-gradient(#e3350d 0 48%,#222 48% 56%,#fff 56%);border:3px solid #222;box-shadow:0 0 0 4px rgba(42,117,187,.35);position:relative}
+.me .beam{display:none;position:absolute;left:50%;top:50%;width:110px;height:110px;transform:translate(-50%,-50%);border-radius:50%;background:conic-gradient(from -28deg,rgba(42,117,187,.55) 0 56deg,transparent 56deg);z-index:-1;pointer-events:none}
+.me.hdg .beam{display:block}
 .me::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;background:#fff;border:3px solid #222;transform:translate(-50%,-50%)}
 
 /* ---- Bottom HUD ---- */
@@ -255,13 +257,27 @@ function start(){
   started=true; $('lens').classList.add('live');
   navigator.geolocation.watchPosition(p=>{
     me=[p.coords.latitude,p.coords.longitude];
-    if(!meMarker){meMarker=new maplibregl.Marker({element:el('<div class="me"></div>')}).setLngLat([me[1],me[0]]).addTo(map);goTo(me,17.5);}
+    if(!meMarker){meMarker=new maplibregl.Marker({element:el('<div class="me"><div class="beam"></div></div>'),rotationAlignment:'map',pitchAlignment:'viewport'}).setLngLat([me[1],me[0]]).addTo(map);goTo(me,17.5);}
+    // ponytail: GPS-Kurs als Fallback, solange kein Kompass-Event kam
+    if(!compassOk&&p.coords.heading!=null&&p.coords.speed>1)setHeading(p.coords.heading);
     else{meMarker.setLngLat([me[1],me[0]]);if(follow)goTo(me);}
     renderHud();
   },e=>{$('banner').textContent='GPS aus? Bitte Standort erlauben.';},{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
   navigator.wakeLock?.request('screen').catch(()=>{});
+  // Blickrichtung (Kompass). iOS will requestPermission aus einer User-Geste – start() ist eine.
+  (window.DeviceOrientationEvent?.requestPermission?.()??Promise.resolve('granted')).then(r=>{
+    if(r!=='granted')return;
+    window.addEventListener('deviceorientationabsolute',onOrient,true);
+    window.addEventListener('deviceorientation',onOrient,true);
+  }).catch(()=>{});
   renderAll();
 }
+let compassOk=false;
+function onOrient(e){
+  const h=e.webkitCompassHeading!=null?e.webkitCompassHeading:(e.absolute&&e.alpha!=null?(360-e.alpha)%360:null);
+  if(h==null)return; compassOk=true; setHeading(h);
+}
+function setHeading(h){ if(!meMarker)return; meMarker.setRotation(h); meMarker.getElement().classList.add('hdg'); }
 $('locBtn').onclick=()=>{follow=true;if(me)goTo(me,Math.max(map.getZoom(),17));};
 
 // ---- HUD ----
