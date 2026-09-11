@@ -204,7 +204,7 @@ const STYLE={version:8,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{
   road('path',['path','track'],[.5,2],'#fff',{'line-dasharray':[2,2],'line-opacity':.8}),
   road('minor_c',['minor','service'],[1.5,9],ROAD2),road('minor',['minor','service'],[1,6],ROAD),
   road('main_c',['tertiary','secondary','primary','trunk','motorway'],[3,16],ROAD2),road('main',['tertiary','secondary','primary','trunk','motorway'],[2,12],ROAD),
-  {id:'bldg',type:'fill-extrusion',source:'omt','source-layer':'building',minzoom:14,paint:{'fill-extrusion-color':BLDG,'fill-extrusion-height':['coalesce',['get','render_height'],8],'fill-extrusion-opacity':.9}},
+  {id:'bldg',type:'fill-extrusion',source:'omt','source-layer':'building',minzoom:14,paint:{'fill-extrusion-color':BLDG,'fill-extrusion-height':['min',['coalesce',['get','render_height'],8],12],'fill-extrusion-opacity':.9}},
   {id:'street_lbl',type:'symbol',source:'omt','source-layer':'transportation_name',minzoom:15,layout:{'symbol-placement':'line','text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':11},paint:{'text-color':'#2f6b3a','text-halo-color':'#fff','text-halo-width':1.5}},
   {id:'place_lbl',type:'symbol',source:'omt','source-layer':'place',filter:['in','class','city','town','village','suburb','neighbourhood'],layout:{'text-field':['get','name'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',18,'town',15,13]},paint:{'text-color':'#fff','text-halo-color':'#2f6b3a','text-halo-width':2}}
  ]};
@@ -212,7 +212,7 @@ const map=new maplibregl.Map({container:'map',style:STYLE,center:[10.4515,51.165
 map.touchPitch.disable();
 map.on('dragstart',()=>follow=false);
 map.on('click',e=>{ if(admin) addStation(e.lngLat.lat,e.lngLat.lng); });
-const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started?55:0,duration:600});
+const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started?50:0,duration:600});
 
 function el(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
 function pmEl(st,i,dim){return el(`<div class="pm${dim?' dim':''}"><div class="ring"></div><img src="${ART(st.pokemon)}"><div class="num">${i+1}</div></div>`)}
