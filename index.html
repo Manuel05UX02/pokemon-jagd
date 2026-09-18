@@ -352,8 +352,10 @@ $('doneClose').onclick=()=>$('doneOv').classList.remove('on');
 $('gearBtn').onclick=()=>{ if(admin){leaveAdmin();return} $('pinIn').value='';$('pinErr').textContent='';$('pinOv').classList.add('on');setTimeout(()=>$('pinIn').focus(),100); };
 $('pinCancel').onclick=()=>$('pinOv').classList.remove('on');
 $('pinOk').onclick=tryPin; $('pinIn').onkeydown=e=>{if(e.key==='Enter')tryPin()};
-function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on');admin=true;$('admin').classList.add('on');$('gearBtn').textContent='👁️';renderAll();if(S.stations.length){const b=new maplibregl.LngLatBounds();S.stations.forEach(s=>b.extend([s.lng,s.lat]));map.fitBounds(b,{padding:60,maxZoom:17,pitch:0,bearing:0});} else map.easeTo({pitch:0,bearing:0});} else $('pinErr').textContent='Falsche PIN'; }
-function leaveAdmin(){admin=false;$('admin').classList.remove('on');$('gearBtn').textContent='⚙️';follow=true;renderAll();}
+function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on');admin=true;flatBuildings(true);$('admin').classList.add('on');$('gearBtn').textContent='👁️';renderAll();if(S.stations.length){const b=new maplibregl.LngLatBounds();S.stations.forEach(s=>b.extend([s.lng,s.lat]));map.fitBounds(b,{padding:60,maxZoom:17,pitch:0,bearing:0});} else map.easeTo({pitch:0,bearing:0});} else $('pinErr').textContent='Falsche PIN'; }
+// ponytail: 3D-Dächer haben Perspektiv-Parallaxe -> beim Zoomen "wandern" sie relativ zum Pin. Im Admin daher flach.
+function flatBuildings(flat){const f=()=>map.setPaintProperty('bldg','fill-extrusion-height',flat?0:['min',['coalesce',['get','render_height'],8],12]);map.isStyleLoaded()?f():map.once('load',f);}
+function leaveAdmin(){admin=false;flatBuildings(false);$('admin').classList.remove('on');$('gearBtn').textContent='⚙️';follow=true;renderAll();}
 $('adminDone').onclick=leaveAdmin;
 
 function addStation(lat,lng){
