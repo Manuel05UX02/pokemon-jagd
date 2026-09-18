@@ -246,6 +246,10 @@ const map=new maplibregl.Map({container:'map',style:STYLE(PAL),center:[10.4515,5
 map.touchPitch.disable();
 map.on('dragstart',()=>follow=false);
 map.on('rotatestart',e=>{if(e.originalEvent)follow=false;});
+// ponytail: während einer Finger-Geste (Pinch/Zoom) nie selbst die Kamera bewegen, sonst "zieht" es die Karte zurück
+let gesturing=false;
+map.on('movestart',e=>{if(e.originalEvent)gesturing=true;});
+map.on('moveend',()=>gesturing=false);
 map.on('click',e=>{ if(admin) addStation(e.lngLat.lat,e.lngLat.lng); });
 const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started&&!admin?50:0,bearing:admin?0:(heading??map.getBearing()),duration:600});
 
@@ -277,7 +281,7 @@ function start(){
       meMarker=new maplibregl.Marker({element:el('<div class="me"></div>')}).setLngLat([me[1],me[0]]).addTo(map);goTo(me,17.5);}
     // ponytail: GPS-Kurs als Fallback, solange kein Kompass-Event kam
     if(!compassOk&&p.coords.heading!=null&&p.coords.speed>1)setHeading(p.coords.heading);
-    else{meMarker.setLngLat([me[1],me[0]]);beam.setLngLat([me[1],me[0]]);if(follow)goTo(me);}
+    else{meMarker.setLngLat([me[1],me[0]]);beam.setLngLat([me[1],me[0]]);if(follow&&!admin&&!gesturing)goTo(me);}
     renderHud();
   },e=>{$('banner').textContent='GPS aus? Bitte Standort erlauben.';},{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
   navigator.wakeLock?.request('screen').catch(()=>{});
@@ -300,7 +304,7 @@ function setHeading(h){
   beam.setRotation(h); beam.getElement().hidden=false;
   // ponytail: Karte dreht sich mit Blickrichtung (wie Google-Maps-Kompassmodus); max ~6x/s, nur wenn wir dem Spieler folgen
   const now=Date.now(), d=((h-map.getBearing()+540)%360)-180;
-  if(follow&&!admin&&Math.abs(d)>1.5&&now-lastTurn>160){lastTurn=now;map.easeTo({bearing:h,center:me?[me[1],me[0]]:undefined,duration:200,easing:t=>t});}
+  if(follow&&!admin&&!gesturing&&Math.abs(d)>1.5&&now-lastTurn>160){lastTurn=now;map.easeTo({bearing:h,center:me?[me[1],me[0]]:undefined,duration:200,easing:t=>t});}
 }
 $('locBtn').onclick=()=>{follow=true;if(me)goTo(me,Math.max(map.getZoom(),17));};
 
