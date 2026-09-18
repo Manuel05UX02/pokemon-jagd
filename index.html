@@ -179,6 +179,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   <h2>💾 Backup</h2>
   <p>Text kopieren und sicher aufheben – oder einfügen und „Laden“ drücken.</p>
   <textarea id="bakText"></textarea>
+  <button class="btn" id="bakShare" style="margin-bottom:8px">🔗 Backup-Link teilen</button>
   <div class="row"><button class="btn grey" id="bakClose">Zurück</button><button class="btn blue" id="bakLoad">Laden</button></div>
 </div></div>
 
@@ -242,7 +243,7 @@ map.touchPitch.disable();
 map.on('dragstart',()=>follow=false);
 map.on('rotatestart',e=>{if(e.originalEvent)follow=false;});
 map.on('click',e=>{ if(admin) addStation(e.lngLat.lat,e.lngLat.lng); });
-const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started?50:0,bearing:heading??map.getBearing(),duration:600});
+const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started&&!admin?50:0,bearing:admin?0:(heading??map.getBearing()),duration:600});
 
 function el(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
 function pmEl(st,i,dim){return el(`<div class="pm${dim?' dim':''}"><div class="ring"></div><img src="${ART(st.pokemon)}"><div class="num">${i+1}</div></div>`)}
@@ -355,7 +356,7 @@ function addStation(lat,lng){
   S.stations.push({lat,lng,pokemon:[25,1,4,7,133,39,143,54][S.stations.length%8],code:String(1000+Math.floor(Math.random()*9000))});
   save(); renderAll(); $('stations').scrollTop=1e9;
 }
-$('addHere').onclick=()=>{ if(!me){alert('Noch keine GPS-Position. Erst ▶ starten (Admin verlassen), dann zurückkommen.');return} addStation(me[0],me[1]); };
+$('addHere').onclick=()=>{ if(!me){if(!started)start();alert('GPS wird gestartet – bitte in ein paar Sekunden nochmal drücken.');return} addStation(me[0],me[1]); };
 
 function renderAdmin(){
   $('stations').innerHTML=S.stations.map((st,i)=>`<div class="st">
@@ -391,6 +392,17 @@ $('resetProg').onclick=()=>{if(confirm('Fortschritt auf Station 1 zurücksetzen?
 $('pinChange').onclick=()=>{const p=prompt('Neue Admin-PIN:',S.pin);if(p&&p.trim()){S.pin=p.trim();save();}};
 $('backupBtn').onclick=()=>{$('bakText').value=JSON.stringify(S);$('bakOv').classList.add('on');};
 $('bakClose').onclick=()=>$('bakOv').classList.remove('on');
+$('bakShare').onclick=()=>{
+  const url=location.origin+location.pathname+'#s='+btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  if(navigator.share)navigator.share({title:'Poké-Jagd Backup',url}).catch(()=>{});
+  else{navigator.clipboard?.writeText(url);prompt('Link kopiert – z.B. per WhatsApp an dich selbst schicken:',url);}
+};
+if(location.hash.startsWith('#s=')){
+  try{const j=JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(3)))));
+    if(Array.isArray(j.stations)&&(!S.stations.length||confirm(`Backup aus Link laden? (${j.stations.length} Stationen, ersetzt die ${S.stations.length} gespeicherten)`))){S=Object.assign({progress:0,pin:'1234'},j);save();}
+  }catch{alert('Backup-Link ungültig')}
+  history.replaceState(null,'',location.pathname);
+}
 $('bakLoad').onclick=()=>{try{const j=JSON.parse($('bakText').value);if(!Array.isArray(j.stations))throw 0;S=Object.assign({progress:0,pin:'1234'},j);save();$('bakOv').classList.remove('on');renderAll();}catch{alert('Ungültiges Backup')}};
 
 renderAll();
