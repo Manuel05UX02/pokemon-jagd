@@ -300,8 +300,20 @@ async function renderMarkers(){
 function dist(a,b,c,d){const r=6371000,p=Math.PI/180,x=(c-a)*p,y=(d-b)*p,h=Math.sin(x/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(y/2)**2;return 2*r*Math.asin(Math.sqrt(h))}
 function start(){
   if(!navigator.geolocation){alert('Kein GPS verfügbar');return}
-  started=true; $('lens').classList.add('live');
-  navigator.geolocation.watchPosition(p=>{
+  started=true; $('lens').classList.add('live'); $('banner').textContent='⏳ Suche GPS…';
+  // ponytail: iOS zeigt nur einen Prompt gleichzeitig -> erst Kompass (braucht die Tipp-Geste), dann Standort
+  (window.DeviceOrientationEvent?.requestPermission?.()??Promise.resolve('granted')).then(r=>{
+    if(r!=='granted')return;
+    window.addEventListener('deviceorientationabsolute',onOrient,true);
+    window.addEventListener('deviceorientation',onOrient,true);
+  }).catch(()=>{}).finally(()=>watchGps(true));
+  navigator.wakeLock?.request('screen').catch(()=>{});
+  renderAll();
+}
+let gpsWatch=null;
+function watchGps(hi){
+  if(gpsWatch!=null)navigator.geolocation.clearWatch(gpsWatch);
+  gpsWatch=navigator.geolocation.watchPosition(p=>{
     me=[p.coords.latitude,p.coords.longitude];
     if(!meMarker){
       beam=new maplibregl.Marker({element:el('<div class="beam" hidden></div>'),rotationAlignment:'map',pitchAlignment:'map'}).setLngLat([me[1],me[0]]).addTo(map);
@@ -314,17 +326,9 @@ function start(){
     // ponytail: Safari merkt sich "Nicht erlauben" pro Website – dann kommt nie wieder eine Abfrage. Klar sagen, wo man es zurücksetzt.
     const b=$('banner');
     if(e.code===1){b.textContent='🚫 Standort blockiert – hier tippen';b.onclick=()=>alert('Safari hat den Standort für diese Seite blockiert.\n\nSo erlaubst du ihn wieder:\n1) In der Adressleiste links auf „aA“ tippen\n2) „Website-Einstellungen“\n3) Standort → „Erlauben“\n\nFalls das nicht hilft: Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites → „Beim Verwenden“.\n\nDanach die Seite neu laden.');}
-    else if(e.code===2){b.textContent='📡 Kein GPS-Signal – bist du drinnen?';}
-    else b.textContent='⏳ Suche GPS…';
-  },{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
-  navigator.wakeLock?.request('screen').catch(()=>{});
-  // Blickrichtung (Kompass). iOS will requestPermission aus einer User-Geste – start() ist eine.
-  (window.DeviceOrientationEvent?.requestPermission?.()??Promise.resolve('granted')).then(r=>{
-    if(r!=='granted')return;
-    window.addEventListener('deviceorientationabsolute',onOrient,true);
-    window.addEventListener('deviceorientation',onOrient,true);
-  }).catch(()=>{});
-  renderAll();
+    else if(hi){b.textContent='📡 Kein GPS – versuche ungenauer…';watchGps(false);}   // ponytail: PC ohne GPS-Chip -> WLAN-Ortung
+    else b.textContent=(e.code===2?'📡 Kein Standort verfügbar':'⏳ Suche GPS…')+' ('+e.code+': '+(e.message||'').slice(0,40)+')';
+  },{enableHighAccuracy:hi,maximumAge:2000,timeout:hi?15000:30000});
 }
 let compassOk=false;
 function onOrient(e){
@@ -431,7 +435,7 @@ function addStation(lat,lng){
   S.stations.push({lat,lng,pokemon:[25,1,4,7,133,39,143,54][S.stations.length%8],code:String(1000+Math.floor(Math.random()*9000))});
   save(); renderAll(); $('stations').scrollTop=1e9;
 }
-$('addHere').onclick=()=>{ if(!me){if(!started)start();alert('GPS wird gestartet – bitte in ein paar Sekunden nochmal drücken.');return} addStation(me[0],me[1]); };
+$('addHere').onclick=()=>{ if(!me){if(!started)start();$('banner').textContent='⏳ GPS startet – gleich nochmal drücken';return} addStation(me[0],me[1]); };
 
 function renderAdmin(){
   $('stations').innerHTML=S.stations.map((st,i)=>`<div class="st">
