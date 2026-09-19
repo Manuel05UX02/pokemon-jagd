@@ -50,6 +50,9 @@ button,input,select{font:inherit}
 .pm.dim img{opacity:.45;filter:grayscale(1);animation:none}
 .pm .ring{position:absolute;left:50%;bottom:-6px;width:34px;height:12px;transform:translateX(-50%);border-radius:50%;background:rgba(255,203,5,.7);border:2px solid #222;z-index:-1}
 .me{width:34px;height:34px;border-radius:50%;background:linear-gradient(#e3350d 0 48%,#222 48% 56%,#fff 56%);border:3px solid #222;box-shadow:0 0 0 4px rgba(42,117,187,.35);position:relative}
+.arrow{width:70px;height:140px;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
+.arrow svg{width:100%;height:100%;display:block}
+.btn.on{background:var(--green);color:#fff}
 .beam{width:140px;height:140px;border-radius:50%;background:conic-gradient(from -28deg,rgba(42,117,187,.6) 0 56deg,transparent 56deg);pointer-events:none}
 .me::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;background:#fff;border:3px solid #222;transform:translate(-50%,-50%)}
 
@@ -203,6 +206,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   <div class="hint">Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge.</div>
   <div id="stations"></div>
   <div class="admin-actions">
+    <button class="btn grey" id="compassBtn">🧭 Kompass-Modus</button>
     <button class="btn grey" id="resetProg">🔄 Fortschritt zurücksetzen</button>
     <button class="btn grey" id="backupBtn">💾 Backup</button>
     <button class="btn grey" id="pinChange">🔒 PIN ändern</button>
@@ -218,7 +222,7 @@ const $=id=>document.getElementById(id);
 
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
-let S=Object.assign({stations:[],progress:0,pin:'1234'},JSON.parse(localStorage.getItem(KEY)||'{}'));
+let S=Object.assign({stations:[],progress:0,pin:'1234',compass:false},JSON.parse(localStorage.getItem(KEY)||'{}'));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 let admin=false, me=null, follow=true, markers=[], meMarker=null, started=false;
 
@@ -279,7 +283,7 @@ map.on('load',()=>{
 function stGeo(){
   return {type:'FeatureCollection',features:S.stations.map((st,i)=>({type:'Feature',geometry:{type:'Point',coordinates:[st.lng,st.lat]},properties:{i,num:i+1,pokemon:st.pokemon,dim:admin&&i<S.progress}}))
     // ponytail: visitor sees ONLY the next station
-    .filter(f=>admin||f.properties.i===S.progress)};
+    .filter(f=>admin||(f.properties.i===S.progress&&!S.compass))};
 }
 async function renderMarkers(){
   if(!mapReady)return;
@@ -301,7 +305,7 @@ function start(){
     // ponytail: GPS-Kurs als Fallback, solange kein Kompass-Event kam
     if(!compassOk&&p.coords.heading!=null&&p.coords.speed>1)setHeading(p.coords.heading);
     else{meMarker.setLngLat([me[1],me[0]]);beam.setLngLat([me[1],me[0]]);if(follow&&!admin&&!gesturing)goTo(me);}
-    renderHud();
+    updateRoute(); renderHud();
   },e=>{$('banner').textContent='GPS aus? Bitte Standort erlauben.';},{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
   navigator.wakeLock?.request('screen').catch(()=>{});
   // Blickrichtung (Kompass). iOS will requestPermission aus einer User-Geste – start() ist eine.
@@ -339,10 +343,41 @@ function renderHud(){
   if(!next){b.textContent='🏆 Alle gefangen!';sc.innerHTML='<span class="grow">Pokémon-Meister! 🎉</span>';mb.textContent='🏆 Nochmal anschauen';mb.onclick=showDone;return}
   const d=me?Math.round(dist(me[0],me[1],next.lat,next.lng)):null;
   b.textContent=`Station ${S.progress+1} von ${n}`;
-  sc.innerHTML=`<img src="${SPR(next.pokemon)}"><span class="grow">Ein wildes ${NAMES[next.pokemon-1]}!<small>${d===null?'Suche GPS…':d<25?'🔥 Du bist ganz nah!':d<80?'🌡️ Warm… fast da!':'📍 noch '+d+' m'}</small></span>`;
+  const hint=d===null?'Suche GPS…':d<25?'🔥 Du bist ganz nah!':d<80?'🌡️ Warm… fast da!':(S.compass?'🧭 Folge dem Pfeil · noch '+(route?Math.round(routeLeft):d)+' m':'📍 noch '+d+' m');
+  sc.innerHTML=`<img src="${SPR(next.pokemon)}"><span class="grow">Ein wildes ${NAMES[next.pokemon-1]}!<small>${hint}</small></span>`;
   mb.textContent='🔑 Code eingeben'; mb.onclick=openCode;
 }
-function renderAll(){renderMarkers();renderHud();if(admin)renderAdmin();}
+// ---- Kompass-Modus: Fußweg-Route (Valhalla, kein Key), aber nur die Richtung wird gezeigt ----
+// ponytail: Route wird neu geholt, wenn keine da ist, das Ziel wechselt oder man >35 m abweicht; max alle 15 s.
+let route=null, routeFor=-1, routeAt=0, routeLeft=0, arrow=null;
+function decode6(str){let i=0,lat=0,lng=0,out=[];while(i<str.length){let b,sh=0,r=0;do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);lat+=(r&1?~(r>>1):r>>1);sh=0;r=0;do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);lng+=(r&1?~(r>>1):r>>1);out.push([lat/1e6,lng/1e6])}return out}
+function bearing(a,b){const p=Math.PI/180,y=Math.sin((b[1]-a[1])*p)*Math.cos(b[0]*p),x=Math.cos(a[0]*p)*Math.sin(b[0]*p)-Math.sin(a[0]*p)*Math.cos(b[0]*p)*Math.cos((b[1]-a[1])*p);return (Math.atan2(y,x)*180/Math.PI+360)%360}
+async function fetchRoute(from,to){
+  const q=JSON.stringify({locations:[{lat:from[0],lon:from[1]},{lat:to.lat,lon:to.lng}],costing:'pedestrian'});
+  const j=await fetch('https://valhalla1.openstreetmap.de/route?json='+encodeURIComponent(q)).then(r=>r.json());
+  return decode6(j.trip.legs[0].shape);
+}
+function updateRoute(){
+  const st=S.stations[S.progress];
+  if(!S.compass||admin||!started||!me||!st){if(arrow)arrow.getElement().hidden=true;return}
+  // nächster Punkt auf der Route + Restweg
+  let best=0,bd=1e9;
+  if(route&&routeFor===S.progress)route.forEach((pt,i)=>{const d=dist(me[0],me[1],pt[0],pt[1]);if(d<bd){bd=d;best=i}});
+  const stale=!route||routeFor!==S.progress||bd>35;
+  if(stale&&Date.now()-routeAt>15000){routeAt=Date.now();fetchRoute(me,st).then(r=>{route=r;routeFor=S.progress;updateRoute();renderHud();}).catch(()=>{});}
+  // Richtung: Punkt ~20 m voraus auf der Route; ohne Route Luftlinie
+  let target=[st.lat,st.lng]; routeLeft=dist(me[0],me[1],st.lat,st.lng);
+  if(route&&routeFor===S.progress){
+    let acc=0,i=best; routeLeft=bd;
+    for(let k=best;k<route.length-1;k++)routeLeft+=dist(route[k][0],route[k][1],route[k+1][0],route[k+1][1]);
+    while(i<route.length-1&&acc<20){acc+=dist(route[i][0],route[i][1],route[i+1][0],route[i+1][1]);i++}
+    target=route[i];
+  }
+  if(!arrow)arrow=new maplibregl.Marker({element:el('<div class="arrow"><svg viewBox="0 0 100 200"><path d="M50 6 L84 64 L50 48 L16 64 Z" fill="#ffcb05" stroke="#222" stroke-width="6" stroke-linejoin="round"/></svg></div>'),rotationAlignment:'map',pitchAlignment:'map',anchor:'center',offset:[0,0]}).setLngLat([me[1],me[0]]).addTo(map);
+  arrow.setLngLat([me[1],me[0]]).setRotation(bearing(me,target)); arrow.getElement().hidden=false;
+}
+$('compassBtn').onclick=()=>{S.compass=!S.compass;save();renderAll();};
+function renderAll(){renderMarkers();renderHud();if(admin){renderAdmin();$('compassBtn').className='btn '+(S.compass?'on':'grey');$('compassBtn').textContent='🧭 Kompass-Modus: '+(S.compass?'AN':'aus');}updateRoute();}
 
 // ---- code overlay ----
 function openCode(){
