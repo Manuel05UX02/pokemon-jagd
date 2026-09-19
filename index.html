@@ -250,23 +250,42 @@ map.on('rotatestart',e=>{if(e.originalEvent)follow=false;});
 let gesturing=false;
 map.on('movestart',e=>{if(e.originalEvent)gesturing=true;});
 map.on('moveend',()=>gesturing=false);
-map.on('click',e=>{ if(admin) addStation(e.lngLat.lat,e.lngLat.lng); });
+map.on('click',e=>{ if(admin&&!map.queryRenderedFeatures(e.point,{layers:['st-icon']}).length) addStation(e.lngLat.lat,e.lngLat.lng); });
 const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started&&!admin?50:0,bearing:admin?0:(heading??map.getBearing()),duration:600});
 
 function el(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
-function pmEl(st,i,dim){return el(`<div class="pm${dim?' dim':''}"><div class="ring"></div><div class="stem"></div><img src="${ART(st.pokemon)}"><div class="num">${i+1}</div><div class="pin"></div></div>`)}
-
-function renderMarkers(){
-  markers.forEach(m=>m.remove()); markers=[];
-  S.stations.forEach((st,i)=>{
+// ponytail: Stationen als Karten-Layer (WebGL) statt HTML-Marker: werden im selben Frame wie die Karte gezeichnet,
+// skalieren mit dem Zoom und können nicht gegen die Karte "driften".
+let mapReady=false, dragI=null;
+const ICON=['interpolate',['exponential',2],['zoom'],14,0.017,19,0.54]; // 475px-Artwork -> ~64px bei z17, verdoppelt sich pro Zoomstufe
+map.on('load',()=>{
+  map.addSource('st',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({id:'st-ring',type:'circle',source:'st',paint:{'circle-color':'rgba(255,203,5,.7)','circle-stroke-color':'#222','circle-stroke-width':2,'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],14,3,19,26]}});
+  map.addLayer({id:'st-icon',type:'symbol',source:'st',layout:{'icon-image':['concat','p',['get','pokemon']],'icon-size':ICON,'icon-anchor':'bottom','icon-offset':[0,-100],'icon-allow-overlap':true,'icon-ignore-placement':true,
+    'text-field':['to-string',['get','num']],'text-font':['Noto Sans Bold'],'text-size':['interpolate',['exponential',2],['zoom'],14,6,19,22],'text-anchor':'top','text-offset':[0,0.5],'text-allow-overlap':true},
+    paint:{'icon-opacity':['case',['get','dim'],0.4,1],'text-color':'#222','text-halo-color':'#ffcb05','text-halo-width':2}});
+  map.addLayer({id:'st-pin',type:'circle',source:'st',paint:{'circle-color':'#e3350d','circle-stroke-color':'#fff','circle-stroke-width':2.5,'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],14,2,19,9]}});
+  map.on('click','st-icon',()=>{if(!admin)openCode();});
+  map.on('mouseenter','st-icon',()=>map.getCanvas().style.cursor='pointer');
+  // drag im Admin
+  const startDrag=e=>{if(!admin||(e.points&&e.points.length!==1))return;dragI=e.features[0].properties.i;map.dragPan.disable();e.preventDefault();};
+  const moveDrag=e=>{if(dragI==null)return;const st=S.stations[dragI];st.lat=e.lngLat.lat;st.lng=e.lngLat.lng;map.getSource('st').setData(stGeo());};
+  const endDrag=()=>{if(dragI==null)return;dragI=null;map.dragPan.enable();save();renderAll();};
+  map.on('mousedown','st-icon',startDrag);map.on('touchstart','st-icon',startDrag);
+  map.on('mousemove',moveDrag);map.on('touchmove',moveDrag);
+  map.on('mouseup',endDrag);map.on('touchend',endDrag);map.on('touchcancel',endDrag);
+  mapReady=true; renderMarkers();
+});
+function stGeo(){
+  return {type:'FeatureCollection',features:S.stations.map((st,i)=>({type:'Feature',geometry:{type:'Point',coordinates:[st.lng,st.lat]},properties:{i,num:i+1,pokemon:st.pokemon,dim:admin&&i<S.progress}}))
     // ponytail: visitor sees ONLY the next station
-    if(!admin && i!==S.progress) return;
-    const e=pmEl(st,i,admin&&i<S.progress);
-    const m=new maplibregl.Marker({element:e,anchor:'bottom',draggable:admin}).setLngLat([st.lng,st.lat]).addTo(map);
-    if(admin) m.on('dragend',()=>{const p=m.getLngLat();st.lat=p.lat;st.lng=p.lng;save();renderAll();});
-    else e.addEventListener('click',openCode);
-    markers.push(m);
-  });
+    .filter(f=>admin||f.properties.i===S.progress)};
+}
+async function renderMarkers(){
+  if(!mapReady)return;
+  const ids=[...new Set(S.stations.map(st=>st.pokemon))].filter(id=>!map.hasImage('p'+id));
+  await Promise.all(ids.map(async id=>{try{const {data}=await map.loadImage(ART(id));if(!map.hasImage('p'+id))map.addImage('p'+id,data);}catch{}}));
+  map.getSource('st').setData(stGeo());
 }
 
 // ---- geolocation ----
