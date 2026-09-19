@@ -207,7 +207,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   <header><span>🛠️ Admin</span><span class="grow"></span>
     <button class="btn sm" id="addHere">📍 Hier setzen</button>
     <button class="btn sm blue" id="adminDone">Fertig ✓</button></header>
-  <div class="hint">Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge.</div>
+  <div class="hint">Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge. <span id="buildTag" style="float:right;opacity:.6"></span></div>
   <div id="stations"></div>
   <div class="admin-actions">
     <button class="btn grey" id="compassBtn">🧭 Kompass-Modus</button>
@@ -226,6 +226,10 @@ const $=id=>document.getElementById(id);
 
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
+// ponytail: Safari hält alte Versionen der Seite fest. version.txt wird beim Deploy geschrieben; weicht sie ab -> mit neuer URL laden (umgeht den Cache).
+const BUILD='20260919-1328';
+fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(v=>{v=v.trim();if(v&&v!==BUILD&&!location.search.includes('b='+v))location.replace(location.pathname+'?b='+v+location.hash);}).catch(()=>{});
+document.getElementById('buildTag').textContent='v'+BUILD;
 let S=Object.assign({stations:[],progress:0,pin:'1234',compass:false},JSON.parse(localStorage.getItem(KEY)||'{}'));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
 let admin=false, me=null, follow=true, markers=[], meMarker=null, started=false;
