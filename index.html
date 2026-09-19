@@ -50,10 +50,10 @@ button,input,select{font:inherit}
 .pm.dim img{opacity:.45;filter:grayscale(1);animation:none}
 .pm .ring{position:absolute;left:50%;bottom:-6px;width:34px;height:12px;transform:translateX(-50%);border-radius:50%;background:rgba(255,203,5,.7);border:2px solid #222;z-index:-1}
 .me{width:34px;height:34px;border-radius:50%;background:linear-gradient(#e3350d 0 48%,#222 48% 56%,#fff 56%);border:3px solid #222;box-shadow:0 0 0 4px rgba(42,117,187,.35);position:relative}
-.arrow{width:70px;height:140px;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
+.arrow{width:80px;height:200px;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
 .arrow svg{width:100%;height:100%;display:block}
 .btn.on{background:var(--green);color:#fff}
-.beam{width:140px;height:140px;border-radius:50%;background:conic-gradient(from -28deg,rgba(42,117,187,.6) 0 56deg,transparent 56deg);pointer-events:none}
+.beam{width:90px;height:90px;border-radius:50%;background:conic-gradient(from -90deg,rgba(42,117,187,.45) 0 180deg,transparent 180deg);pointer-events:none}
 .me::after{content:"";position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:50%;background:#fff;border:3px solid #222;transform:translate(-50%,-50%)}
 
 /* ---- Bottom HUD ---- */
@@ -85,6 +85,8 @@ button,input,select{font:inherit}
 .stars{position:relative;height:0}.stars i{position:absolute;left:50%;top:0;font-size:28px;animation:fly 1.2s ease-out forwards}
 @keyframes fly{to{transform:translate(var(--x),var(--y)) rotate(360deg);opacity:0}}
 .caught{font-size:36px}
+.note{background:#fff;border:3px dashed var(--blue);border-radius:14px;padding:10px 14px;margin:0 0 14px;font-size:17px;font-weight:600;white-space:pre-wrap;text-align:left}
+.note::before{content:"📜 Hinweis";display:block;font-size:12px;color:var(--blue);margin-bottom:4px;letter-spacing:1px}
 .card h2.logo{font-size:28px;-webkit-text-stroke-width:1.5px}
 /* Fang-Animation: Pokéball wackelt 3x, dann Klick, dann Pokémon */
 .ball{width:120px;height:120px;margin:10px auto;border-radius:50%;background:linear-gradient(#e3350d 0 47%,#222 47% 55%,#fff 55%);border:5px solid #222;position:relative;transform-origin:50% 90%;animation:wobble 2.1s ease-in-out}
@@ -108,6 +110,7 @@ button,input,select{font:inherit}
 .grid button img{width:56px;height:56px;image-rendering:pixelated}.grid button.sel{background:var(--yellow)}
 .grid button:active{transform:scale(.95)}
 .st .fields{display:flex;flex-direction:column;gap:4px;min-width:0}
+.st textarea{width:100%;padding:5px 8px;border:2px solid #999;border-radius:8px;background:#fff;font-size:13px;resize:none}
 .st input,.st select{width:100%;padding:5px 8px;border:2px solid #999;border-radius:8px;background:#fff}
 .st .coord{font-size:12px;color:#555;background:none;border:0;padding:0;text-align:left;cursor:pointer;font-variant-numeric:tabular-nums}
 .st .ctl{display:flex;flex-direction:column;gap:3px}
@@ -161,6 +164,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
     <img class="big" id="winImg" alt="">
     <div class="caught logo">GEFANGEN!</div>
     <p id="winText"></p>
+    <div class="note" id="winHint" hidden></div>
     <button class="btn" id="winNext">Weiter ➜</button>
   </div>
 </div></div>
@@ -373,7 +377,7 @@ function updateRoute(){
     while(i<route.length-1&&acc<20){acc+=dist(route[i][0],route[i][1],route[i+1][0],route[i+1][1]);i++}
     target=route[i];
   }
-  if(!arrow)arrow=new maplibregl.Marker({element:el('<div class="arrow"><svg viewBox="0 0 100 200"><path d="M50 6 L84 64 L50 48 L16 64 Z" fill="#ffcb05" stroke="#222" stroke-width="6" stroke-linejoin="round"/></svg></div>'),rotationAlignment:'map',pitchAlignment:'map',anchor:'center',offset:[0,0]}).setLngLat([me[1],me[0]]).addTo(map);
+  if(!arrow)arrow=new maplibregl.Marker({element:el('<div class="arrow"><svg viewBox="0 0 100 250"><path d="M50 4 L84 62 L50 46 L16 62 Z" fill="#ffcb05" stroke="#222" stroke-width="6" stroke-linejoin="round"/></svg></div>'),rotationAlignment:'map',pitchAlignment:'map',anchor:'center',offset:[0,0]}).setLngLat([me[1],me[0]]).addTo(map);
   arrow.setLngLat([me[1],me[0]]).setRotation(bearing(me,target)); arrow.getElement().hidden=false;
 }
 $('compassBtn').onclick=()=>{S.compass=!S.compass;save();renderAll();};
@@ -392,6 +396,7 @@ function checkCode(){
   if(v && v===String(st.code||'').trim().toLowerCase()){
     $('codeOv').classList.remove('on'); S.progress++; save();
     $('winImg').src=ART(st.pokemon); $('winText').textContent=`${NAMES[st.pokemon-1]} ist jetzt in deinem Pokédex!`;
+    $('winHint').textContent=st.hint||''; $('winHint').hidden=!(st.hint||'').trim();
     $('stars').innerHTML=Array.from({length:12},(_,i)=>`<i style="--x:${(Math.random()*300-150)|0}px;--y:${(Math.random()*-220-40)|0}px;animation-delay:${i*40}ms">${['⭐','✨','🌟'][i%3]}</i>`).join('');
     const card=$('winOv').firstElementChild; card.className='card win-wait'; $('winOv').classList.add('on'); renderAll();
     card.querySelector('.ball').style.animation='none'; void card.offsetWidth; card.querySelector('.ball').style.animation='';
@@ -428,12 +433,13 @@ function renderAdmin(){
     <div class="fields">
       <button class="pick" data-i="${i}" data-a="pick"><img src="${SPR(st.pokemon)}"><span>#${st.pokemon} ${NAMES[st.pokemon-1]}</span> ▾</button>
       <input data-i="${i}" data-k="code" value="${st.code||''}" placeholder="Geheim-Code" autocapitalize="characters">
+      <textarea data-i="${i}" data-k="hint" rows="2" placeholder="Hinweis für den nächsten Ort (nach dem Fangen)">${(st.hint||'').replace(/</g,'&lt;')}</textarea>
       <button class="coord" data-i="${i}" data-a="copy" title="Koordinaten kopieren">📍 ${st.lat.toFixed(5)}, ${st.lng.toFixed(5)}</button>
     </div>
     <div class="ctl"><button data-i="${i}" data-a="up">▲</button><button data-i="${i}" data-a="down">▼</button><button class="del" data-i="${i}" data-a="del">✕</button></div>
   </div>`).join('') || '<p style="text-align:center;color:#777">Noch keine Stationen. Tippe auf die Karte!</p>';
 }
-$('stations').addEventListener('change',e=>{const t=e.target;if(t.dataset.k==='code'){S.stations[+t.dataset.i].code=t.value;save();}});
+
 
 // ---- Pokémon picker ----
 let pickFor=-1;
@@ -444,7 +450,7 @@ $('pickSearch').oninput=filterPick;
 $('pickClose').onclick=()=>$('pickOv').classList.remove('on');
 $('pickGrid').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.stations[pickFor].pokemon=+b.dataset.id;save();$('pickOv').classList.remove('on');renderAll();};
 
-$('stations').addEventListener('input',e=>{const t=e.target;if(t.dataset.k==='code'){S.stations[+t.dataset.i].code=t.value;save();}});
+$('stations').addEventListener('input',e=>{const t=e.target,k=t.dataset.k;if(k==='code'||k==='hint'){S.stations[+t.dataset.i][k]=t.value;save();}});
 $('stations').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const i=+b.dataset.i,a=b.dataset.a,s=S.stations;
   if(a==='pick'){openPick(i);return}
