@@ -310,7 +310,13 @@ function start(){
     if(!compassOk&&p.coords.heading!=null&&p.coords.speed>1)setHeading(p.coords.heading);
     else{meMarker.setLngLat([me[1],me[0]]);beam.setLngLat([me[1],me[0]]);if(follow&&!admin&&!gesturing)goTo(me);}
     updateRoute(); renderHud();
-  },e=>{$('banner').textContent='GPS aus? Bitte Standort erlauben.';},{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+  },e=>{
+    // ponytail: Safari merkt sich "Nicht erlauben" pro Website – dann kommt nie wieder eine Abfrage. Klar sagen, wo man es zurücksetzt.
+    const b=$('banner');
+    if(e.code===1){b.textContent='🚫 Standort blockiert – hier tippen';b.onclick=()=>alert('Safari hat den Standort für diese Seite blockiert.\n\nSo erlaubst du ihn wieder:\n1) In der Adressleiste links auf „aA“ tippen\n2) „Website-Einstellungen“\n3) Standort → „Erlauben“\n\nFalls das nicht hilft: Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites → „Beim Verwenden“.\n\nDanach die Seite neu laden.');}
+    else if(e.code===2){b.textContent='📡 Kein GPS-Signal – bist du drinnen?';}
+    else b.textContent='⏳ Suche GPS…';
+  },{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
   navigator.wakeLock?.request('screen').catch(()=>{});
   // Blickrichtung (Kompass). iOS will requestPermission aus einer User-Geste – start() ist eine.
   (window.DeviceOrientationEvent?.requestPermission?.()??Promise.resolve('granted')).then(r=>{
