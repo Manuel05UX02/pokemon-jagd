@@ -95,8 +95,10 @@ button,input,select{font:inherit}
 .win-done .ball{display:none}.win-wait .reveal{display:none}
 
 /* ---- Admin sheet ---- */
-#admin{position:fixed;left:0;right:0;bottom:0;z-index:1500;background:var(--paper);border-top:5px solid #222;border-radius:22px 22px 0 0;max-height:62vh;display:none;flex-direction:column;box-shadow:0 -6px 0 rgba(0,0,0,.25)}
+#admin{position:fixed;left:0;right:0;bottom:0;z-index:1500;background:var(--paper);border-top:5px solid #222;border-radius:22px 22px 0 0;max-height:55vh;display:none;flex-direction:column;box-shadow:0 -6px 0 rgba(0,0,0,.25)}
 #admin.on{display:flex}
+#admin.min #stations,#admin.min .hint,#admin.min .admin-actions{display:none}
+#adminMin{width:36px;height:36px;border:3px solid #222;border-radius:10px;background:#fff;font-size:16px;cursor:pointer;flex:none}
 #admin header{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:2px dashed #ccc;font-weight:700}
 #admin header .grow{flex:1}
 #stations{overflow:auto;padding:8px 12px;flex:1}
@@ -204,7 +206,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
 
 <!-- Admin sheet -->
 <div id="admin">
-  <header><span>🛠️ Admin</span><span class="grow"></span>
+  <header><button id="adminMin" title="Liste ein-/ausklappen">▾</button><span>🛠️ Admin</span><span class="grow"></span>
     <button class="btn sm" id="addHere">📍 Hier setzen</button>
     <button class="btn sm blue" id="adminDone">Fertig ✓</button></header>
   <div class="hint">Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge. <span id="buildTag" style="float:right;opacity:.6"></span></div>
@@ -227,7 +229,7 @@ const $=id=>document.getElementById(id);
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
 // ponytail: Safari hält alte Versionen der Seite fest. version.txt wird beim Deploy geschrieben; weicht sie ab -> mit neuer URL laden (umgeht den Cache).
-const BUILD='20260919-1328';
+const BUILD='20260919-1404';
 fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(v=>{v=v.trim();if(v&&v!==BUILD&&!location.search.includes('b='+v))location.replace(location.pathname+'?b='+v+location.hash);}).catch(()=>{});
 document.getElementById('buildTag').textContent='v'+BUILD;
 let S=Object.assign({stations:[],progress:0,pin:'1234',compass:false},JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -307,7 +309,7 @@ function start(){
   started=true; $('lens').classList.add('live'); $('banner').textContent='⏳ Suche GPS…';
   // ponytail: iOS zeigt nur einen Prompt gleichzeitig -> erst Kompass (braucht die Tipp-Geste), dann Standort
   (window.DeviceOrientationEvent?.requestPermission?.()??Promise.resolve('granted')).then(r=>{
-    if(r!=='granted')return;
+    if(r!=='granted'){$('banner').textContent='🧭 Kompass blockiert – Seite neu laden & erlauben';return}
     window.addEventListener('deviceorientationabsolute',onOrient,true);
     window.addEventListener('deviceorientation',onOrient,true);
   }).catch(()=>{}).finally(()=>watchGps(true));
@@ -434,6 +436,7 @@ function tryPin(){ if($('pinIn').value===S.pin){$('pinOv').classList.remove('on'
 function flatBuildings(flat){const f=()=>map.setPaintProperty('bldg','fill-extrusion-height',flat?0:['min',['coalesce',['get','render_height'],8],12]);map.isStyleLoaded()?f():map.once('load',f);}
 function leaveAdmin(){admin=false;flatBuildings(false);$('admin').classList.remove('on');$('gearBtn').textContent='⚙️';follow=true;renderAll();}
 $('adminDone').onclick=leaveAdmin;
+$('adminMin').onclick=()=>{const m=$('admin').classList.toggle('min');$('adminMin').textContent=m?'▴':'▾';};
 
 function addStation(lat,lng){
   S.stations.push({lat,lng,pokemon:[25,1,4,7,133,39,143,54][S.stations.length%8],code:String(1000+Math.floor(Math.random()*9000))});
