@@ -257,7 +257,7 @@ function el(html){const d=document.createElement('div');d.innerHTML=html;return 
 // ponytail: Stationen als Karten-Layer (WebGL) statt HTML-Marker: werden im selben Frame wie die Karte gezeichnet,
 // skalieren mit dem Zoom und können nicht gegen die Karte "driften".
 let mapReady=false, dragI=null;
-const ICON=['interpolate',['exponential',2],['zoom'],14,0.017,19,0.54]; // 475px-Artwork -> ~64px bei z17, verdoppelt sich pro Zoomstufe
+const ICON=['interpolate',['exponential',2],['zoom'],14,0.017,18,0.27]; // 475px-Artwork: 8px@z14 … 64px@z17 … 128px@z18, skaliert 1:1 mit der Karte, ab z18 gedeckelt
 map.on('load',()=>{
   map.addSource('st',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'st-ring',type:'circle',source:'st',paint:{'circle-color':'rgba(255,203,5,.7)','circle-stroke-color':'#222','circle-stroke-width':2,'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],14,3,19,26]}});
