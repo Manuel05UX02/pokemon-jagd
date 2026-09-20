@@ -27,7 +27,7 @@ button,input,select{font:inherit}
 @keyframes pulse{0%{transform:scale(.7);opacity:1}100%{transform:scale(1.15);opacity:0}}
 .leds{display:flex;gap:6px}.leds i{width:12px;height:12px;border-radius:50%;border:2px solid #222;display:block}
 .leds i:nth-child(1){background:#ff5d5d}.leds i:nth-child(2){background:#ffe066}.leds i:nth-child(3){background:#6fe08a}
-.dex-title{flex:1;text-align:center;line-height:0}.dex-title img{height:52px;max-width:100%;object-fit:contain;filter:drop-shadow(0 3px 0 rgba(0,0,0,.3))}
+.dex-title{flex:1;text-align:center;line-height:0}.dex-title img{height:46px;max-width:100%;object-fit:contain;filter:drop-shadow(0 3px 0 rgba(0,0,0,.3))}
 .icon-btn{width:44px;height:44px;border-radius:12px;border:3px solid #222;background:var(--yellow);font-size:22px;display:grid;place-items:center;box-shadow:0 3px 0 #222;cursor:pointer;flex:none}
 .icon-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #222}
 
@@ -285,7 +285,7 @@ const $=id=>document.getElementById(id);
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
 // ponytail: Safari hält alte Versionen der Seite fest. version.txt wird beim Deploy geschrieben; weicht sie ab -> mit neuer URL laden (umgeht den Cache).
-const BUILD='20260920-1158';
+const BUILD='20260920-1159';
 fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(v=>{v=v.trim();if(v&&v!==BUILD&&!location.search.includes('b='+v))location.replace(location.pathname+'?b='+v+location.hash);}).catch(()=>{});
 document.getElementById('buildTag').textContent='v'+BUILD;
 let S=Object.assign({stations:[],progress:0,pin:'1234',compass:false},JSON.parse(localStorage.getItem(KEY)||'{}'));
