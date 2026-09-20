@@ -265,6 +265,8 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   <div id="stations"></div>
   <div class="admin-actions">
     <button class="btn grey" id="startBtn" title="Startpunkt der Route zu Station 1">🏁 Start = hier</button>
+    <button class="btn grey" id="rewardPosBtn" title="Ort der Belohnung – der Kompass führt nach der letzten Station dorthin">🎁 Ziel = hier</button>
+    <button class="btn grey" id="rewardRouteBtn" hidden>🛣️ Route → 🎁</button>
     <button class="btn grey" id="compassBtn">🧭 Kompass-Modus</button>
     <button class="btn grey" id="resetProg">🔄 Fortschritt zurücksetzen</button>
     <button class="btn grey" id="backupBtn">💾 Backup</button>
@@ -283,7 +285,7 @@ const $=id=>document.getElementById(id);
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
 // ponytail: Safari hält alte Versionen der Seite fest. version.txt wird beim Deploy geschrieben; weicht sie ab -> mit neuer URL laden (umgeht den Cache).
-const BUILD='20260920-1124';
+const BUILD='20260920-1146';
 fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(v=>{v=v.trim();if(v&&v!==BUILD&&!location.search.includes('b='+v))location.replace(location.pathname+'?b='+v+location.hash);}).catch(()=>{});
 document.getElementById('buildTag').textContent='v'+BUILD;
 let S=Object.assign({stations:[],progress:0,pin:'1234',compass:false},JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -333,8 +335,8 @@ map.on('load',()=>{
     'text-field':['to-string',['get','num']],'text-font':['Noto Sans Bold'],'text-size':['interpolate',['exponential',2],['zoom'],14,6,19,22],'text-anchor':'top','text-offset':[0,0.5],'text-allow-overlap':true},
     paint:{'icon-opacity':['case',['get','dim'],0.4,1],'text-color':'#222','text-halo-color':'#ffcb05','text-halo-width':2}});
   map.addLayer({id:'st-pin',type:'circle',source:'st',paint:{'circle-color':'#e3350d','circle-stroke-color':'#fff','circle-stroke-width':2.5,'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],14,2,19,9]}});
-  map.setFilter('st-icon',['!=',['get','kind'],'start']); map.setFilter('st-ring',['!=',['get','kind'],'start']);
-  map.addLayer({id:'start-lbl',type:'symbol',source:'st',filter:['==',['get','kind'],'start'],layout:{'text-field':'START','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,-1.3],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'#222','text-halo-width':2}});
+  map.setFilter('st-icon',['!',['has','kind']]); map.setFilter('st-ring',['!',['has','kind']]);
+  map.addLayer({id:'start-lbl',type:'symbol',source:'st',filter:['has','kind'],layout:{'text-field':['get','label'],'text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,-1.3],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'#222','text-halo-width':2}});
   map.addSource('rt',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'rt-line',type:'line',source:'rt',filter:['==','$type','LineString'],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#2a75bb','line-width':6,'line-opacity':.85}},'st-ring');
   map.addLayer({id:'rt-wp',type:'circle',source:'rt',filter:['==','$type','Point'],paint:{'circle-radius':9,'circle-color':'#fff','circle-stroke-color':'#2a75bb','circle-stroke-width':3}});
@@ -350,7 +352,7 @@ map.on('load',()=>{
   map.on('mouseenter','st-icon',()=>map.getCanvas().style.cursor='pointer');
   // drag im Admin
   const startDrag=e=>{if(!admin||(e.points&&e.points.length!==1))return;dragI=e.features[0].properties.i;map.dragPan.disable();e.preventDefault();};
-  const moveDrag=e=>{if(dragI==null)return;const st=dragI==='start'?S.start:S.stations[dragI];st.lat=e.lngLat.lat;st.lng=e.lngLat.lng;map.getSource('st').setData(stGeo());};
+  const moveDrag=e=>{if(dragI==null)return;const st=dragI==='start'?S.start:dragI==='reward'?S.reward:S.stations[dragI];st.lat=e.lngLat.lat;st.lng=e.lngLat.lng;map.getSource('st').setData(stGeo());};
   const endDrag=()=>{if(dragI==null)return;dragI=null;map.dragPan.enable();save();renderAll();};
   map.on('mousedown','st-icon',startDrag);map.on('touchstart','st-icon',startDrag);map.on('mousedown','start-lbl',startDrag);map.on('touchstart','start-lbl',startDrag);
   map.on('mousemove',moveDrag);map.on('touchmove',moveDrag);
@@ -361,7 +363,9 @@ function stGeo(){
   return {type:'FeatureCollection',features:S.stations.map((st,i)=>({type:'Feature',geometry:{type:'Point',coordinates:[st.lng,st.lat]},properties:{i,num:i+1,pokemon:st.pokemon,dim:admin&&i<S.progress}}))
     // ponytail: visitor sees ONLY the next station
     .filter(f=>admin||(f.properties.i===S.progress&&!S.compass))
-    .concat(admin&&S.start?[{type:'Feature',geometry:{type:'Point',coordinates:[S.start.lng,S.start.lat]},properties:{i:'start',kind:'start',num:''}}]:[])};
+    .concat(admin&&S.start?[{type:'Feature',geometry:{type:'Point',coordinates:[S.start.lng,S.start.lat]},properties:{i:'start',kind:'start',label:'START',num:''}}]:[])
+    // Belohnungs-Ort: im Admin immer; für Kinder erst nach dem letzten Pokémon (und nur ohne Kompass-Modus)
+    .concat(S.reward&&(admin||(S.progress>=S.stations.length&&!S.compass&&!S.arrived))?[{type:'Feature',geometry:{type:'Point',coordinates:[S.reward.lng,S.reward.lat]},properties:{i:'reward',kind:'reward',label:'ZIEL',num:''}}]:[])};
 }
 async function renderMarkers(){
   if(!mapReady)return;
@@ -396,6 +400,8 @@ function watchGps(hi){
     // ponytail: GPS-Kurs als Fallback, solange kein Kompass-Event kam
     if(!compassOk&&p.coords.heading!=null&&p.coords.speed>1)setHeading(p.coords.heading);
     else{meMarker.setLngLat([me[1],me[0]]);beam.setLngLat([me[1],me[0]]);if(follow&&!admin&&!gesturing)goTo(me);}
+    // Belohnungs-Ort erreicht?
+    if(S.reward&&!S.arrived&&S.progress>=S.stations.length&&dist(me[0],me[1],S.reward.lat,S.reward.lng)<20){S.arrived=true;save();showDone();}
     updateRoute(); renderHud();
   },e=>{
     // ponytail: Safari merkt sich "Nicht erlauben" pro Website – dann kommt nie wieder eine Abfrage. Klar sagen, wo man es zurücksetzt.
@@ -429,6 +435,13 @@ function renderHud(){
   b.className='banner'; mb.style.display='';
   if(!started){b.textContent='Tippe auf ▶ um zu starten';sc.innerHTML='<span class="grow">Bereit für die Jagd?</span>';mb.textContent='▶ Los geht\'s!';mb.onclick=start;return}
   if(!n){b.textContent='Noch keine Stationen';sc.innerHTML='<span class="grow">Der Admin muss erst Stationen setzen.</span>';mb.style.display='none';return}
+  if(!next&&S.reward&&!S.arrived){
+    const dr=me?Math.round(dist(me[0],me[1],S.reward.lat,S.reward.lng)):null;
+    b.textContent='🎁 Auf zur Belohnung!';
+    sc.innerHTML=`<span class="grow">Alle Pokémon gefangen!<small>${dr===null?'Suche GPS…':dr<25?'🔥 Gleich geschafft!':(S.compass?'🧭 Folge dem Pfeil · noch '+(route?Math.round(routeLeft):dr)+' m':'📍 noch '+dr+' m')}</small></span>`;
+    mb.textContent=dr!==null&&dr<40?'🎁 Ich bin da!':'🎁 Belohnung suchen…'; mb.disabled=!(dr!==null&&dr<40);
+    mb.onclick=()=>{S.arrived=true;save();showDone();renderAll();}; return}
+  mb.disabled=false;
   if(!next){b.textContent='🏆 Alle gefangen!';sc.innerHTML='<span class="grow">Pokémon-Meister! 🎉</span>';mb.textContent='🏆 Nochmal anschauen';mb.onclick=showDone;return}
   const d=me?Math.round(dist(me[0],me[1],next.lat,next.lng)):null;
   b.textContent=`Station ${S.progress+1} von ${n}`;
@@ -448,29 +461,34 @@ async function fetchRoute(from,to,wps=[]){
 }
 // ---- Feste Routen (Admin): Start/vorherige Station -> Station, über Wegpunkte. Werden gespeichert; der Kompass folgt ihnen exakt. ----
 let routeSel=-1;
+const tgt=i=>i<S.stations.length?S.stations[i]:(S.reward||null);
+const tgtName=i=>i<S.stations.length?'Station '+(i+1):'Belohnung 🎁';
 function routeFrom(i){return i>0?[S.stations[i-1].lat,S.stations[i-1].lng]:S.start?[S.start.lat,S.start.lng]:me;}
 async function buildRoute(i){
-  const st=S.stations[i], from=routeFrom(i);
+  const st=tgt(i), from=routeFrom(i);
   if(!from){alert('Für Station 1 fehlt der Startpunkt: erst „🏁 Start = hier“ drücken (oder GPS starten).');return}
   st.wps=st.wps||[]; $('banner').textContent='⏳ Route wird berechnet…';
   try{st.route=await fetchRoute(from,st,st.wps);}catch{alert('Route konnte nicht berechnet werden (Internet?)');}
   save(); renderAll();
 }
 function addWp(lat,lng){
-  const st=S.stations[routeSel]; st.wps=st.wps||[];
+  const st=tgt(routeSel); st.wps=st.wps||[];
   const near=pt=>{let b=0,bd=1e9;st.route.forEach((r,k)=>{const d=dist(pt[0],pt[1],r[0],r[1]);if(d<bd){bd=d;b=k}});return b};
   const k=near([lat,lng]), pos=st.wps.filter(w=>near(w)<k).length;   // Wegpunkte bleiben in Laufrichtung sortiert
   st.wps.splice(pos,0,[lat,lng]); buildRoute(routeSel);
 }
 function rtGeo(){
-  const st=admin&&routeSel>=0?S.stations[routeSel]:null;
+  const st=admin&&routeSel>=0?tgt(routeSel):null;
   if(!st||!st.route)return {type:'FeatureCollection',features:[]};
   return {type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:st.route.map(p=>[p[1],p[0]])},properties:{}},
     ...(st.wps||[]).map((w,idx)=>({type:'Feature',geometry:{type:'Point',coordinates:[w[1],w[0]]},properties:{idx}}))]};
 }
-$('startBtn').onclick=()=>{const c=me?{lat:me[0],lng:me[1]}:(()=>{const m=map.getCenter();return {lat:m.lat,lng:m.lng}})();S.start=c;save();renderAll();};
+const hereOrCenter=()=>me?{lat:me[0],lng:me[1]}:(()=>{const m=map.getCenter();return {lat:m.lat,lng:m.lng}})();
+$('startBtn').onclick=()=>{S.start=hereOrCenter();save();renderAll();};
+$('rewardPosBtn').onclick=()=>{S.reward=Object.assign(S.reward||{},hereOrCenter());delete S.reward.route;save();renderAll();};
+$('rewardRouteBtn').onclick=()=>{const n=S.stations.length;routeSel=routeSel===n?-1:n;if(routeSel>=0&&!S.reward.route)buildRoute(n);else renderAll();};
 function updateRoute(){
-  const st=S.stations[S.progress];
+  const st=S.arrived?null:tgt(S.progress);
   if(!S.compass||admin||!started||!me||!st){if(arrow)arrow.getElement().hidden=true;return}
   // nächster Punkt auf der Route + Restweg
   if(st.route&&st.route.length){route=st.route;routeFor=S.progress;}   // feste Admin-Route: immer nur zum nächsten Punkt darauf zeigen
@@ -516,7 +534,7 @@ function checkCode(){
     $('codeIn').value=''; $('codeIn').focus();
   }
 }
-$('winNext').onclick=()=>{$('winOv').classList.remove('on'); if(S.progress>=S.stations.length)showDone(); else follow=true;};
+$('winNext').onclick=()=>{$('winOv').classList.remove('on'); if(S.progress>=S.stations.length&&!S.reward)showDone(); else follow=true;};
 $('rewardBtn').onclick=()=>{$('rewardTextIn').value=S.rewardText||'';$('rewardImgIn').value=S.rewardImg||'';$('rewardOv').classList.add('on');};
 $('rewardCancel').onclick=()=>$('rewardOv').classList.remove('on');
 $('rewardSave').onclick=()=>{S.rewardText=$('rewardTextIn').value.trim();S.rewardImg=$('rewardImgIn').value.trim();save();$('rewardOv').classList.remove('on');};
@@ -559,7 +577,8 @@ function renderAdmin(){
     <div class="ctl"><button data-i="${i}" data-a="up">▲</button><button data-i="${i}" data-a="down">▼</button><button class="rt${routeSel===i?' on':''}" data-i="${i}" data-a="route" title="Route zu dieser Station">🛣️</button><button class="del" data-i="${i}" data-a="del">✕</button></div>
   </div>`).join('') || '<p style="text-align:center;color:#777">Noch keine Stationen. Tippe auf die Karte!</p>';
   const h=document.querySelector('#admin .hint');
-  if(routeSel>=0){const st=S.stations[routeSel];h.innerHTML=`🛣️ Route zu Station ${routeSel+1}${st.route?' ('+Math.round(st.route.slice(1).reduce((a,p,k)=>a+dist(st.route[k][0],st.route[k][1],p[0],p[1]),0))+' m)':''}: Linie tippen = Wegpunkt · Punkt ziehen = verschieben · Punkt tippen = löschen <button class="btn grey" id="rtRecalc">↻ Neu</button><button class="btn grey" id="rtClear">Route löschen</button><button class="btn grey" id="rtClose">Schließen</button>`;
+  $('rewardRouteBtn').hidden=!S.reward; $('rewardRouteBtn').className='btn '+(routeSel===S.stations.length?'on':'grey');
+  if(routeSel>=0){const st=tgt(routeSel);h.innerHTML=`🛣️ Route zu ${tgtName(routeSel)}${st.route?' ('+Math.round(st.route.slice(1).reduce((a,p,k)=>a+dist(st.route[k][0],st.route[k][1],p[0],p[1]),0))+' m)':''}: Linie tippen = Wegpunkt · Punkt ziehen = verschieben · Punkt tippen = löschen <button class="btn grey" id="rtRecalc">↻ Neu</button><button class="btn grey" id="rtClear">Route löschen</button><button class="btn grey" id="rtClose">Schließen</button>`;
     $('rtRecalc').onclick=()=>buildRoute(routeSel);$('rtClear').onclick=()=>{delete st.route;st.wps=[];save();renderAll();};$('rtClose').onclick=()=>{routeSel=-1;renderAll();};}
   else h.innerHTML='Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge. 🛣️ = Route ansehen/bearbeiten. <span id="buildTag" style="float:right;opacity:.6">v'+BUILD+'</span>';
 }
@@ -601,10 +620,10 @@ $('stations').addEventListener('click',e=>{
   if(a==='up'&&i>0)[s[i-1],s[i]]=[s[i],s[i-1]];
   if(a==='down'&&i<s.length-1)[s[i+1],s[i]]=[s[i],s[i+1]];
   // Reihenfolge/Löschen ändert die Startpunkte der Routen -> feste Routen verwerfen (Wegpunkte bleiben), Admin rechnet neu
-  s.forEach(x=>delete x.route); routeSel=-1;
+  s.forEach(x=>delete x.route); if(S.reward)delete S.reward.route; routeSel=-1;
   if(S.progress>s.length)S.progress=s.length; save();renderAll();
 });
-$('resetProg').onclick=()=>{if(confirm('Fortschritt auf Station 1 zurücksetzen?')){S.progress=0;save();renderAll();}};
+$('resetProg').onclick=()=>{if(confirm('Fortschritt auf Station 1 zurücksetzen?')){S.progress=0;S.arrived=false;save();renderAll();}};
 $('pinChange').onclick=()=>{const p=prompt('Neue Admin-PIN:',S.pin);if(p&&p.trim()){S.pin=p.trim();save();}};
 $('backupBtn').onclick=()=>{$('bakText').value=JSON.stringify(S);$('bakOv').classList.add('on');};
 $('bakClose').onclick=()=>$('bakOv').classList.remove('on');
