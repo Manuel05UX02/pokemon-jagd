@@ -119,6 +119,8 @@ button,input,select{font:inherit}
 .st .ctl{display:flex;flex-direction:column;gap:3px}
 .st .ctl button{width:32px;height:26px;border:2px solid #222;border-radius:6px;background:var(--yellow);font-size:13px;cursor:pointer;line-height:1}
 .st .ctl button.del{background:#ff8a80}
+.st .ctl button.rt{background:#cfe3ff}.st .ctl button.rt.on{background:var(--blue);color:#fff}
+.hint .btn{font-size:12px;padding:4px 8px;margin-left:4px}
 .admin-actions{padding:8px 12px calc(env(safe-area-inset-bottom) + 8px);display:flex;gap:8px;flex-wrap:wrap;border-top:2px dashed #ccc}
 .admin-actions .btn{flex:1;font-size:14px;padding:9px 6px}
 .hint{font-size:13px;color:#555;padding:0 14px 6px}
@@ -213,6 +215,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   <div class="hint">Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge. <span id="buildTag" style="float:right;opacity:.6"></span></div>
   <div id="stations"></div>
   <div class="admin-actions">
+    <button class="btn grey" id="startBtn" title="Startpunkt der Route zu Station 1">🏁 Start = hier</button>
     <button class="btn grey" id="compassBtn">🧭 Kompass-Modus</button>
     <button class="btn grey" id="resetProg">🔄 Fortschritt zurücksetzen</button>
     <button class="btn grey" id="backupBtn">💾 Backup</button>
@@ -230,7 +233,7 @@ const $=id=>document.getElementById(id);
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
 // ponytail: Safari hält alte Versionen der Seite fest. version.txt wird beim Deploy geschrieben; weicht sie ab -> mit neuer URL laden (umgeht den Cache).
-const BUILD='20260920-1037';
+const BUILD='20260920-1049';
 fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(v=>{v=v.trim();if(v&&v!==BUILD&&!location.search.includes('b='+v))location.replace(location.pathname+'?b='+v+location.hash);}).catch(()=>{});
 document.getElementById('buildTag').textContent='v'+BUILD;
 let S=Object.assign({stations:[],progress:0,pin:'1234',compass:false},JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -265,7 +268,7 @@ map.on('rotatestart',e=>{if(e.originalEvent)follow=false;});
 let gesturing=false;
 map.on('movestart',e=>{if(e.originalEvent)gesturing=true;});
 map.on('moveend',()=>gesturing=false);
-map.on('click',e=>{ if(admin&&!map.queryRenderedFeatures(e.point,{layers:['st-icon']}).length) addStation(e.lngLat.lat,e.lngLat.lng); });
+map.on('click',e=>{ if(admin&&mapReady&&!map.queryRenderedFeatures(e.point,{layers:['st-icon','start-lbl','rt-line','rt-wp']}).length) addStation(e.lngLat.lat,e.lngLat.lng); });
 const goTo=(ll,zoom)=>map.easeTo({center:[ll[1],ll[0]],zoom:zoom??map.getZoom(),pitch:started&&!admin?50:0,bearing:admin?0:(heading??map.getBearing()),duration:600});
 
 function el(html){const d=document.createElement('div');d.innerHTML=html;return d.firstElementChild}
@@ -280,13 +283,26 @@ map.on('load',()=>{
     'text-field':['to-string',['get','num']],'text-font':['Noto Sans Bold'],'text-size':['interpolate',['exponential',2],['zoom'],14,6,19,22],'text-anchor':'top','text-offset':[0,0.5],'text-allow-overlap':true},
     paint:{'icon-opacity':['case',['get','dim'],0.4,1],'text-color':'#222','text-halo-color':'#ffcb05','text-halo-width':2}});
   map.addLayer({id:'st-pin',type:'circle',source:'st',paint:{'circle-color':'#e3350d','circle-stroke-color':'#fff','circle-stroke-width':2.5,'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],14,2,19,9]}});
+  map.setFilter('st-icon',['!=',['get','kind'],'start']); map.setFilter('st-ring',['!=',['get','kind'],'start']);
+  map.addLayer({id:'start-lbl',type:'symbol',source:'st',filter:['==',['get','kind'],'start'],layout:{'text-field':'START','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,-1.3],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'#222','text-halo-width':2}});
+  map.addSource('rt',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({id:'rt-line',type:'line',source:'rt',filter:['==','$type','LineString'],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#2a75bb','line-width':6,'line-opacity':.85}},'st-ring');
+  map.addLayer({id:'rt-wp',type:'circle',source:'rt',filter:['==','$type','Point'],paint:{'circle-radius':9,'circle-color':'#fff','circle-stroke-color':'#2a75bb','circle-stroke-width':3}});
   map.on('click','st-icon',()=>{if(!admin)openCode();});
+  // Route bearbeiten: Linie tippen = Wegpunkt einfügen, Wegpunkt tippen = löschen, Wegpunkt ziehen = verschieben
+  map.on('click','rt-line',e=>{if(!admin||routeSel<0||map.queryRenderedFeatures(e.point,{layers:['rt-wp']}).length)return;addWp(e.lngLat.lat,e.lngLat.lng);});
+  map.on('click','rt-wp',e=>{if(!admin||routeSel<0||wpMoved)return;S.stations[routeSel].wps.splice(e.features[0].properties.idx,1);buildRoute(routeSel);});
+  let dragWp=null,wpMoved=false;
+  const wpDown=e=>{if(!admin||routeSel<0||(e.points&&e.points.length!==1))return;dragWp=e.features[0].properties.idx;wpMoved=false;map.dragPan.disable();e.preventDefault();};
+  const wpMove=e=>{if(dragWp==null)return;wpMoved=true;S.stations[routeSel].wps[dragWp]=[e.lngLat.lat,e.lngLat.lng];map.getSource('rt').setData(rtGeo());};
+  const wpUp=()=>{if(dragWp==null)return;dragWp=null;map.dragPan.enable();if(wpMoved)buildRoute(routeSel);setTimeout(()=>wpMoved=false,50);};
+  map.on('mousedown','rt-wp',wpDown);map.on('touchstart','rt-wp',wpDown);map.on('mousemove',wpMove);map.on('touchmove',wpMove);map.on('mouseup',wpUp);map.on('touchend',wpUp);map.on('touchcancel',wpUp);
   map.on('mouseenter','st-icon',()=>map.getCanvas().style.cursor='pointer');
   // drag im Admin
   const startDrag=e=>{if(!admin||(e.points&&e.points.length!==1))return;dragI=e.features[0].properties.i;map.dragPan.disable();e.preventDefault();};
-  const moveDrag=e=>{if(dragI==null)return;const st=S.stations[dragI];st.lat=e.lngLat.lat;st.lng=e.lngLat.lng;map.getSource('st').setData(stGeo());};
+  const moveDrag=e=>{if(dragI==null)return;const st=dragI==='start'?S.start:S.stations[dragI];st.lat=e.lngLat.lat;st.lng=e.lngLat.lng;map.getSource('st').setData(stGeo());};
   const endDrag=()=>{if(dragI==null)return;dragI=null;map.dragPan.enable();save();renderAll();};
-  map.on('mousedown','st-icon',startDrag);map.on('touchstart','st-icon',startDrag);
+  map.on('mousedown','st-icon',startDrag);map.on('touchstart','st-icon',startDrag);map.on('mousedown','start-lbl',startDrag);map.on('touchstart','start-lbl',startDrag);
   map.on('mousemove',moveDrag);map.on('touchmove',moveDrag);
   map.on('mouseup',endDrag);map.on('touchend',endDrag);map.on('touchcancel',endDrag);
   mapReady=true; renderMarkers();
@@ -294,13 +310,15 @@ map.on('load',()=>{
 function stGeo(){
   return {type:'FeatureCollection',features:S.stations.map((st,i)=>({type:'Feature',geometry:{type:'Point',coordinates:[st.lng,st.lat]},properties:{i,num:i+1,pokemon:st.pokemon,dim:admin&&i<S.progress}}))
     // ponytail: visitor sees ONLY the next station
-    .filter(f=>admin||(f.properties.i===S.progress&&!S.compass))};
+    .filter(f=>admin||(f.properties.i===S.progress&&!S.compass))
+    .concat(admin&&S.start?[{type:'Feature',geometry:{type:'Point',coordinates:[S.start.lng,S.start.lat]},properties:{i:'start',kind:'start',num:''}}]:[])};
 }
 async function renderMarkers(){
   if(!mapReady)return;
   const ids=[...new Set(S.stations.map(st=>st.pokemon))].filter(id=>!map.hasImage('p'+id));
   await Promise.all(ids.map(async id=>{try{const {data}=await map.loadImage(ART(id));if(!map.hasImage('p'+id))map.addImage('p'+id,data);}catch{}}));
   map.getSource('st').setData(stGeo());
+  map.getSource('rt').setData(rtGeo());
 }
 
 // ---- geolocation ----
@@ -373,18 +391,42 @@ function renderHud(){
 let route=null, routeFor=-1, routeAt=0, routeLeft=0, arrow=null;
 function decode6(str){let i=0,lat=0,lng=0,out=[];while(i<str.length){let b,sh=0,r=0;do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);lat+=(r&1?~(r>>1):r>>1);sh=0;r=0;do{b=str.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);lng+=(r&1?~(r>>1):r>>1);out.push([lat/1e6,lng/1e6])}return out}
 function bearing(a,b){const p=Math.PI/180,y=Math.sin((b[1]-a[1])*p)*Math.cos(b[0]*p),x=Math.cos(a[0]*p)*Math.sin(b[0]*p)-Math.sin(a[0]*p)*Math.cos(b[0]*p)*Math.cos((b[1]-a[1])*p);return (Math.atan2(y,x)*180/Math.PI+360)%360}
-async function fetchRoute(from,to){
-  const q=JSON.stringify({locations:[{lat:from[0],lon:from[1]},{lat:to.lat,lon:to.lng}],costing:'pedestrian'});
+async function fetchRoute(from,to,wps=[]){
+  const q=JSON.stringify({locations:[{lat:from[0],lon:from[1]},...wps.map(w=>({lat:w[0],lon:w[1],type:'through'})),{lat:to.lat,lon:to.lng}],costing:'pedestrian'});
   const j=await fetch('https://valhalla1.openstreetmap.de/route?json='+encodeURIComponent(q)).then(r=>r.json());
-  return decode6(j.trip.legs[0].shape);
+  return j.trip.legs.flatMap(l=>decode6(l.shape));
 }
+// ---- Feste Routen (Admin): Start/vorherige Station -> Station, über Wegpunkte. Werden gespeichert; der Kompass folgt ihnen exakt. ----
+let routeSel=-1;
+function routeFrom(i){return i>0?[S.stations[i-1].lat,S.stations[i-1].lng]:S.start?[S.start.lat,S.start.lng]:me;}
+async function buildRoute(i){
+  const st=S.stations[i], from=routeFrom(i);
+  if(!from){alert('Für Station 1 fehlt der Startpunkt: erst „🏁 Start = hier“ drücken (oder GPS starten).');return}
+  st.wps=st.wps||[]; $('banner').textContent='⏳ Route wird berechnet…';
+  try{st.route=await fetchRoute(from,st,st.wps);}catch{alert('Route konnte nicht berechnet werden (Internet?)');}
+  save(); renderAll();
+}
+function addWp(lat,lng){
+  const st=S.stations[routeSel]; st.wps=st.wps||[];
+  const near=pt=>{let b=0,bd=1e9;st.route.forEach((r,k)=>{const d=dist(pt[0],pt[1],r[0],r[1]);if(d<bd){bd=d;b=k}});return b};
+  const k=near([lat,lng]), pos=st.wps.filter(w=>near(w)<k).length;   // Wegpunkte bleiben in Laufrichtung sortiert
+  st.wps.splice(pos,0,[lat,lng]); buildRoute(routeSel);
+}
+function rtGeo(){
+  const st=admin&&routeSel>=0?S.stations[routeSel]:null;
+  if(!st||!st.route)return {type:'FeatureCollection',features:[]};
+  return {type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:st.route.map(p=>[p[1],p[0]])},properties:{}},
+    ...(st.wps||[]).map((w,idx)=>({type:'Feature',geometry:{type:'Point',coordinates:[w[1],w[0]]},properties:{idx}}))]};
+}
+$('startBtn').onclick=()=>{const c=me?{lat:me[0],lng:me[1]}:(()=>{const m=map.getCenter();return {lat:m.lat,lng:m.lng}})();S.start=c;save();renderAll();};
 function updateRoute(){
   const st=S.stations[S.progress];
   if(!S.compass||admin||!started||!me||!st){if(arrow)arrow.getElement().hidden=true;return}
   // nächster Punkt auf der Route + Restweg
+  if(st.route&&st.route.length){route=st.route;routeFor=S.progress;}   // feste Admin-Route: immer nur zum nächsten Punkt darauf zeigen
   let best=0,bd=1e9;
   if(route&&routeFor===S.progress)route.forEach((pt,i)=>{const d=dist(me[0],me[1],pt[0],pt[1]);if(d<bd){bd=d;best=i}});
-  const stale=!route||routeFor!==S.progress||bd>35;
+  const stale=!st.route&&(!route||routeFor!==S.progress||bd>35);
   if(stale&&Date.now()-routeAt>15000){routeAt=Date.now();fetchRoute(me,st).then(r=>{route=r;routeFor=S.progress;updateRoute();renderHud();}).catch(()=>{});}
   // Richtung: Punkt ~20 m voraus auf der Route; ohne Route Luftlinie
   let target=[st.lat,st.lng]; routeLeft=dist(me[0],me[1],st.lat,st.lng);
@@ -454,8 +496,12 @@ function renderAdmin(){
       <textarea data-i="${i}" data-k="hint" rows="2" placeholder="Hinweis für den nächsten Ort (nach dem Fangen)">${(st.hint||'').replace(/</g,'&lt;')}</textarea>
       <input class="coord" data-i="${i}" data-k="coord" value="${st.lat.toFixed(6)}, ${st.lng.toFixed(6)}" inputmode="decimal" title="Koordinaten (Google-Maps-Format: Breite, Länge)">
     </div>
-    <div class="ctl"><button data-i="${i}" data-a="up">▲</button><button data-i="${i}" data-a="down">▼</button><button class="del" data-i="${i}" data-a="del">✕</button></div>
+    <div class="ctl"><button data-i="${i}" data-a="up">▲</button><button data-i="${i}" data-a="down">▼</button><button class="rt${routeSel===i?' on':''}" data-i="${i}" data-a="route" title="Route zu dieser Station">🛣️</button><button class="del" data-i="${i}" data-a="del">✕</button></div>
   </div>`).join('') || '<p style="text-align:center;color:#777">Noch keine Stationen. Tippe auf die Karte!</p>';
+  const h=document.querySelector('#admin .hint');
+  if(routeSel>=0){const st=S.stations[routeSel];h.innerHTML=`🛣️ Route zu Station ${routeSel+1}${st.route?' ('+Math.round(st.route.slice(1).reduce((a,p,k)=>a+dist(st.route[k][0],st.route[k][1],p[0],p[1]),0))+' m)':''}: Linie tippen = Wegpunkt · Punkt ziehen = verschieben · Punkt tippen = löschen <button class="btn grey" id="rtRecalc">↻ Neu</button><button class="btn grey" id="rtClear">Route löschen</button><button class="btn grey" id="rtClose">Schließen</button>`;
+    $('rtRecalc').onclick=()=>buildRoute(routeSel);$('rtClear').onclick=()=>{delete st.route;st.wps=[];save();renderAll();};$('rtClose').onclick=()=>{routeSel=-1;renderAll();};}
+  else h.innerHTML='Auf die Karte tippen = neue Station. Marker ziehen = verschieben. ▲▼ = Reihenfolge. 🛣️ = Route ansehen/bearbeiten. <span id="buildTag" style="float:right;opacity:.6">v'+BUILD+'</span>';
 }
 
 
@@ -490,9 +536,12 @@ $('stations').addEventListener('change',e=>{
 $('stations').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const i=+b.dataset.i,a=b.dataset.a,s=S.stations;
   if(a==='pick'){openPick(i);return}
+  if(a==='route'){routeSel=routeSel===i?-1:i;if(routeSel>=0&&!s[i].route)buildRoute(i);else renderAll();if(routeSel>=0&&s[i].route){const b=new maplibregl.LngLatBounds();s[i].route.forEach(p=>b.extend([p[1],p[0]]));map.fitBounds(b,{padding:70,maxZoom:17});}return}
   if(a==='del'){if(!confirm(`Station ${i+1} löschen?`))return;s.splice(i,1);}
   if(a==='up'&&i>0)[s[i-1],s[i]]=[s[i],s[i-1]];
   if(a==='down'&&i<s.length-1)[s[i+1],s[i]]=[s[i],s[i+1]];
+  // Reihenfolge/Löschen ändert die Startpunkte der Routen -> feste Routen verwerfen (Wegpunkte bleiben), Admin rechnet neu
+  s.forEach(x=>delete x.route); routeSel=-1;
   if(S.progress>s.length)S.progress=s.length; save();renderAll();
 });
 $('resetProg').onclick=()=>{if(confirm('Fortschritt auf Station 1 zurücksetzen?')){S.progress=0;save();renderAll();}};
