@@ -84,6 +84,18 @@ button,input,select{font:inherit}
 .row{display:flex;gap:8px;margin-top:10px}.row .btn{flex:1}
 .stars{position:relative;height:0}.stars i{position:absolute;left:50%;top:0;font-size:28px;animation:fly 1.2s ease-out forwards}
 @keyframes fly{to{transform:translate(var(--x),var(--y)) rotate(360deg);opacity:0}}
+/* Belohnung: Pokal mit Strahlen + Konfetti */
+.reward{position:relative;width:200px;height:200px;margin:0 auto 6px}
+.reward .rays{position:absolute;inset:-30px;border-radius:50%;background:repeating-conic-gradient(rgba(255,203,5,.55) 0 10deg,transparent 10deg 20deg);animation:spin 14s linear infinite;-webkit-mask:radial-gradient(circle,#000 30%,transparent 70%);mask:radial-gradient(circle,#000 30%,transparent 70%)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.reward svg{position:relative;width:100%;height:100%;filter:drop-shadow(0 6px 4px rgba(0,0,0,.35));animation:bounce 1.6s ease-in-out infinite}
+@keyframes bounce{50%{transform:translateY(-8px) scale(1.03)}}
+.reward img.custom{position:relative;width:100%;height:100%;object-fit:contain;border-radius:16px}
+.confetti{position:absolute;inset:0;overflow:hidden;pointer-events:none;border-radius:22px}
+.confetti i{position:absolute;top:-12px;width:10px;height:14px;border-radius:2px;animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+.reward-text{background:#fff;border:3px solid var(--yellow);border-radius:14px;padding:10px 14px;margin:8px 0 14px;font-size:18px;font-weight:700;white-space:pre-wrap}
+.card.done{position:relative;overflow:hidden}
 .caught{font-size:36px}
 .note{background:#fff;border:3px dashed var(--blue);border-radius:14px;padding:10px 14px;margin:0 0 14px;font-size:17px;font-weight:600;white-space:pre-wrap;text-align:left}
 .note::before{content:"📜 Hinweis";display:block;font-size:12px;color:var(--blue);margin-bottom:4px;letter-spacing:1px}
@@ -175,9 +187,36 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
 </div></div>
 
 <!-- Alles geschafft -->
-<div class="ov" id="doneOv"><div class="card">
+<div class="ov" id="doneOv"><div class="card done">
+  <div class="confetti" id="confetti"></div>
+  <div class="reward" id="reward">
+    <div class="rays"></div>
+    <svg viewBox="0 0 200 200" id="trophy">
+      <!-- Pokal -->
+      <path d="M60 40h80v40c0 30-18 50-40 50S60 110 60 80z" fill="#ffcb05" stroke="#222" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M60 50H38c-4 0-6 3-5 7 3 18 14 30 27 34" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+      <path d="M140 50h22c4 0 6 3 5 7-3 18-14 30-27 34" fill="none" stroke="#222" stroke-width="6" stroke-linecap="round"/>
+      <path d="M60 50H38c-4 0-6 3-5 7 3 18 14 30 27 34" fill="none" stroke="#ffcb05" stroke-width="3" stroke-linecap="round"/>
+      <path d="M140 50h22c4 0 6 3 5 7-3 18-14 30-27 34" fill="none" stroke="#ffcb05" stroke-width="3" stroke-linecap="round"/>
+      <rect x="88" y="128" width="24" height="18" fill="#e3a500" stroke="#222" stroke-width="5"/>
+      <path d="M66 146h68l8 26H58z" fill="#3c5aa6" stroke="#222" stroke-width="6" stroke-linejoin="round"/>
+      <rect x="52" y="172" width="96" height="14" rx="4" fill="#222"/>
+      <!-- Pokéball-Emblem -->
+      <circle cx="100" cy="82" r="22" fill="#e3350d" stroke="#222" stroke-width="5"/>
+      <path d="M78 82h44" stroke="#222" stroke-width="5"/>
+      <path d="M100 104A22 22 0 0 1 78 82h44a22 22 0 0 1-22 22z" fill="#fff"/>
+      <circle cx="100" cy="82" r="7" fill="#fff" stroke="#222" stroke-width="4"/>
+      <!-- Glanz -->
+      <path d="M72 48q0 30 10 48" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".6" fill="none"/>
+      <!-- Sterne -->
+      <path d="M30 30l4 8 9 1-6 6 2 9-9-5-9 5 2-9-6-6 9-1z" fill="#fff" stroke="#222" stroke-width="3"/>
+      <path d="M170 24l4 8 9 1-6 6 2 9-9-5-9 5 2-9-6-6 9-1z" fill="#fff" stroke="#222" stroke-width="3"/>
+      <path d="M160 130l3 6 7 1-5 5 1 7-6-4-7 4 2-7-5-5 7-1z" fill="#fff" stroke="#222" stroke-width="2.5"/>
+    </svg>
+  </div>
   <h2 class="logo">Pokémon-Meister!</h2>
   <p>Ihr habt alle Pokémon gefangen!</p>
+  <div class="reward-text" id="rewardText" hidden></div>
   <div class="dexbar" id="doneBar" style="flex-wrap:wrap;margin-bottom:14px"></div>
   <button class="btn" id="doneClose">Super!</button>
 </div></div>
@@ -207,6 +246,16 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
   <button class="btn grey" id="pickClose" style="margin-top:10px">Zurück</button>
 </div></div>
 
+<!-- Belohnung -->
+<div class="ov" id="rewardOv"><div class="card">
+  <h2>🏆 Belohnung (letzte Station)</h2>
+  <p style="text-align:left;font-size:14px">Text, der auf dem Sieger-Bildschirm steht – z. B. wo die Schatzkiste versteckt ist:</p>
+  <textarea id="rewardTextIn" rows="3" style="width:100%;font-size:16px;border:2px solid #999;border-radius:10px;padding:8px" placeholder="Eure Belohnung wartet in der Küche! 🎁"></textarea>
+  <p style="text-align:left;font-size:14px;margin-top:10px">Eigenes Bild statt Pokal (optional, Bild-Link):</p>
+  <input id="rewardImgIn" style="width:100%;font-size:14px;border:2px solid #999;border-radius:10px;padding:8px" placeholder="https://…/bild.png">
+  <div class="row"><button class="btn grey" id="rewardCancel">Zurück</button><button class="btn blue" id="rewardPreview">Vorschau</button><button class="btn" id="rewardSave">Speichern</button></div>
+</div></div>
+
 <!-- Admin sheet -->
 <div id="admin">
   <header><button id="adminMin" title="Liste ein-/ausklappen">▾</button><span>🛠️ Admin</span><span class="grow"></span>
@@ -219,6 +268,7 @@ textarea{width:100%;height:120px;font-size:12px;border:2px solid #999;border-rad
     <button class="btn grey" id="compassBtn">🧭 Kompass-Modus</button>
     <button class="btn grey" id="resetProg">🔄 Fortschritt zurücksetzen</button>
     <button class="btn grey" id="backupBtn">💾 Backup</button>
+    <button class="btn grey" id="rewardBtn">🏆 Belohnung</button>
     <button class="btn grey" id="pinChange">🔒 PIN ändern</button>
   </div>
 </div>
@@ -233,7 +283,7 @@ const $=id=>document.getElementById(id);
 // ---- state (ponytail: localStorage, same device for admin + kids) ----
 const KEY='pokejagd';
 // ponytail: Safari hält alte Versionen der Seite fest. version.txt wird beim Deploy geschrieben; weicht sie ab -> mit neuer URL laden (umgeht den Cache).
-const BUILD='20260920-1049';
+const BUILD='20260920-1124';
 fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(v=>{v=v.trim();if(v&&v!==BUILD&&!location.search.includes('b='+v))location.replace(location.pathname+'?b='+v+location.hash);}).catch(()=>{});
 document.getElementById('buildTag').textContent='v'+BUILD;
 let S=Object.assign({stations:[],progress:0,pin:'1234',compass:false},JSON.parse(localStorage.getItem(KEY)||'{}'));
@@ -467,7 +517,17 @@ function checkCode(){
   }
 }
 $('winNext').onclick=()=>{$('winOv').classList.remove('on'); if(S.progress>=S.stations.length)showDone(); else follow=true;};
-function showDone(){$('doneBar').innerHTML=S.stations.map(st=>`<div class="slot"><img src="${SPR(st.pokemon)}"></div>`).join('');$('doneOv').classList.add('on');}
+$('rewardBtn').onclick=()=>{$('rewardTextIn').value=S.rewardText||'';$('rewardImgIn').value=S.rewardImg||'';$('rewardOv').classList.add('on');};
+$('rewardCancel').onclick=()=>$('rewardOv').classList.remove('on');
+$('rewardSave').onclick=()=>{S.rewardText=$('rewardTextIn').value.trim();S.rewardImg=$('rewardImgIn').value.trim();save();$('rewardOv').classList.remove('on');};
+$('rewardPreview').onclick=()=>{$('rewardSave').onclick();showDone();};
+function showDone(){
+  $('rewardText').textContent=S.rewardText||''; $('rewardText').hidden=!S.rewardText;
+  $('trophy').style.display=S.rewardImg?'none':''; $('reward').querySelector('img.custom')?.remove();
+  if(S.rewardImg)$('reward').appendChild(el(`<img class="custom" src="${S.rewardImg.replace(/"/g,'')}" alt="">`));
+  // ponytail: Konfetti = 40 fallende Rechtecke, zufällige Farbe/Startspalte/Tempo
+  $('confetti').innerHTML=Array.from({length:40},(_,i)=>`<i style="left:${Math.random()*100}%;background:${['#e3350d','#ffcb05','#3c5aa6','#3fbf5a','#fff'][i%5]};animation-duration:${2.5+Math.random()*3}s;animation-delay:${-Math.random()*5}s;transform:rotate(${Math.random()*360}deg)"></i>`).join('');
+$('doneBar').innerHTML=S.stations.map(st=>`<div class="slot"><img src="${SPR(st.pokemon)}"></div>`).join('');$('doneOv').classList.add('on');}
 $('doneClose').onclick=()=>$('doneOv').classList.remove('on');
 
 // ---- admin ----
